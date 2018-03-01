@@ -1,0 +1,25 @@
+{
+  "name": "EdoJointReset",
+  "description": "Edo Joint Reset message structure",
+  "namespace": "@",
+  "fields": [
+    {
+      "name": "joints_mask",
+      "description": "Mask of joints",
+      "type": "UINT64",
+      "size": 1
+    },
+    {
+      "name": "disengage_steps",
+      "description": "Time spent in brake disengage [ms]",
+      "type": "UINT32",
+      "size": 1
+    },
+    {
+      "name": "disengage_offset",
+      "description": "position offset to move in brake disengage",
+      "type": "FLOAT32",
+      "size": 1
+    }
+  ]
+}

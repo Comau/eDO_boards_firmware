@@ -1,0 +1,21 @@
+{
+  "name": "edo-gripper",
+  "description": "edo-gripper",
+  "module": "edo-gripper",
+  "os_version": "CHIBIOS_16",
+  "required_os_components": [],
+  "required_packages": [
+    "common_msgs",
+    "led",
+    "dynamixel_driver",
+    "dynamixel_msgs",
+    "edo_msgs",
+    "control_msgs"
+  ],
+  "sources": [
+    "main.cpp"
+  ],
+  "includes": [],
+  "bootloader_size": 16384,
+  "configuration_size": 2048
+}

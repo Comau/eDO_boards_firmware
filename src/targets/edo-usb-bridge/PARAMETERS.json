@@ -1,0 +1,16 @@
+{
+  "name": "edo-usb-bridge",
+  "description": "USB module template configuration",
+  "objects": [
+    {
+      "object": "led_publisher",
+      "package": "led",
+      "parameters": "PublisherConfiguration"
+    },
+    {
+      "object": "led_subscriber",
+      "package": "led",
+      "parameters": "SubscriberConfiguration"
+    }
+  ]
+}

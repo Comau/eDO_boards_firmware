@@ -1,0 +1,11 @@
+{
+  "name": "edo-joint_bootloader",
+  "description": "Bootloader for e.DO modular robot joint controller",
+  "chip": "STM32F303CC",
+  "required_packages": [],
+  "chibios_components": [
+    "nil",
+    "hal",
+    "pal"
+  ]
+}

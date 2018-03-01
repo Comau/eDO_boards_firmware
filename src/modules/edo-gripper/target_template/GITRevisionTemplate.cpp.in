@@ -1,0 +1,9 @@
+#if TAGS_SIZE > 0
+// The following strings will be placed at the end of the output binary
+const char CORE_GIT_DESC[] __attribute__ ((used, section(".core_git_desc"))) = "@CORE_GIT_DESC@" ;
+const char WRKS_GIT_DESC[] __attribute__ ((used, section(".wrks_git_desc"))) = "@WRKS_GIT_DESC@";
+
+const char CORE_GIT_DESC_TAG[] __attribute__ ((used, section(".tags"))) = "CORE_GIT_DESC:@CORE_GIT_DESC@";
+const char WRKS_GIT_DESC_TAG[] __attribute__ ((used, section(".tags"))) = "WRKS_GIT_DESC:@WRKS_GIT_DESC@";
+const char DATETIME_TAG[]      __attribute__ ((used, section(".tags"))) = "BUILT:" __DATE__ "@" __TIME__;
+#endif

@@ -1,0 +1,19 @@
+{
+  "name": "ControlPIDNodeConfiguration",
+  "description": "Control node configuration",
+  "namespace": "@",
+  "fields": [
+    {
+      "name": "pos_validity",
+      "description": "Position validity",
+      "type": "UINT16",
+      "size": 1
+    },
+    {
+      "name": "position",
+      "description": "Saved position",
+      "type": "FLOAT32",
+      "size": 1
+    }
+  ]
+}

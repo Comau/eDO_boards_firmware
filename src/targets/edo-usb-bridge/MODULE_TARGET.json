@@ -1,0 +1,17 @@
+{
+  "name": "edo-usb-bridge",
+  "description": "edo-usb-bridge",
+  "module": "usb",
+  "os_version": "CHIBIOS_16",
+  "required_os_components": [],
+  "required_packages": [
+    "common_msgs",
+    "led"
+  ],
+  "sources": [
+    "main.cpp"
+  ],
+  "includes": [],
+  "bootloader_size": 16384,
+  "configuration_size": 2048
+}

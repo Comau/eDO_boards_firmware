@@ -1,0 +1,26 @@
+{
+  "name": "@@NAME@@",
+  "description": "uDC module template configuration",
+  "objects": [
+    {
+      "object": "m_encoder",
+      "package": "QEI_driver",
+      "parameters": "QEI_DeltaConfiguration"
+    },
+    {
+      "object": "led_sub",
+      "package": "led",
+      "parameters": "SubscriberConfiguration"
+    },
+    {
+      "object": "enc_pub",
+      "package": "sensor_publisher",
+      "parameters": "Configuration"
+    },
+    {
+      "object": "pwm_sub",
+      "package": "actuator_subscriber",
+      "parameters": "Configuration"
+    }
+  ]
+}

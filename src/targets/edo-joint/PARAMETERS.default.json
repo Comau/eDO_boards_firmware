@@ -1,0 +1,21 @@
+{
+  "target": "@@NAME@@",
+  "name": "default",
+  "description": "Default configuration",
+  "parameters": {
+    "pwm_sub": {
+      "topic": "pwm"
+    },
+    "enc_pub": {
+      "topic": "enc"
+    },
+    "m_encoder": {
+      "ticks": 1000.0,
+      "period": 50,
+      "invert": 0
+    },
+    "led_sub": {
+      "topic": "led"
+    }
+  }
+}

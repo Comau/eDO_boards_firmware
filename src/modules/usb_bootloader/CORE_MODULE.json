@@ -1,0 +1,13 @@
+{
+  "name": "usb_bootloader",
+  "description": "USB module",
+  "chip": "STM32F303CC",
+  "required_packages": [    "stm32_crc",
+    "stm32_flash"
+  ],
+  "chibios_components": [
+    "nil",
+    "hal",
+    "pal"
+  ]
+}

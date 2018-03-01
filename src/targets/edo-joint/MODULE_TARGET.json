@@ -1,0 +1,29 @@
+{
+  "name": "edo-joint",
+  "description": "edo-joint",
+  "module": "edo-joint",
+  "os_version": "CHIBIOS_16",
+  "required_os_components": [],
+  "required_packages": [
+    "MC33926_driver",
+    "QEI_driver",
+    "common_msgs",
+    "led",
+    "actuator_msgs",
+    "actuator_subscriber",
+    "basic_sensors",
+    "sensor_msgs",
+    "sensor_publisher",
+    "control_msgs",
+    "edo_msgs",
+    "interpolation_package",
+    "control_pid",
+     "master_package"
+  ],
+  "sources": [
+    "main.cpp"
+  ],
+  "includes": [],
+  "bootloader_size": 16384,
+  "configuration_size": 2048
+}

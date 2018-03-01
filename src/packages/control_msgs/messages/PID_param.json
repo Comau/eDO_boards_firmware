@@ -1,0 +1,121 @@
+{
+  "name": "PID_param",
+  "description": "Parameters for PID control",
+  "namespace": "@",
+  "fields": [
+  {
+      "name": "kp",
+      "description": "PID Gain",
+      "type": "FLOAT32",
+      "size": 1
+    },
+    {
+      "name": "ti",
+      "description": "Integral time",
+      "type": "FLOAT32",
+      "size": 1
+    },
+    {
+      "name": "td",
+      "description": "Derivative time",
+      "type": "FLOAT32",
+      "size": 1
+    }, 
+   {
+      "name": "sat",
+      "description": "control saturation pre feedforward",
+      "type": "FLOAT32",
+      "size": 1
+    },
+    {
+      "name": "kff",
+      "description": "feedforward gain",
+      "type": "FLOAT32",
+      "size": 1
+    },
+    {
+      "name": "max",
+      "description": "Maximum output",
+      "type": "FLOAT32",
+      "size": 1
+    },
+    { 
+      "name": "kpv",
+      "description": "Proportional gain - velocity",
+      "type": "FLOAT32",
+      "size": 1
+    },
+    { 
+      "name": "tiv",
+      "description": "integral time- velocity",
+      "type": "FLOAT32",
+      "size": 1
+    },
+    { 
+      "name": "tdv",
+      "description": "derivative time- velocity",
+      "type": "FLOAT32",
+      "size": 1
+    },
+    { 
+      "name": "satv",
+      "description": "PID saturation pre-feedfroward - velocity",
+      "type": "FLOAT32",
+      "size": 1
+    },
+     {
+      "name": "kffv",
+      "description": "feedforward gain velocity",
+      "type": "FLOAT32",
+      "size": 1
+     },
+   {
+      "name": "maxv",
+      "description": "Maximum output - velocity",
+      "type": "FLOAT32",
+      "size": 1
+    },
+    { 
+      "name": "kpt",
+      "description": "Proportional gain - torque",
+      "type": "FLOAT32",
+      "size": 1
+    },
+    { 
+      "name": "tit",
+      "description": "integral time- torque",
+      "type": "FLOAT32",
+      "size": 1
+    },
+    { 
+      "name": "tdt",
+      "description": "derivative time- torque",
+      "type": "FLOAT32",
+      "size": 1
+    },
+    { 
+      "name": "satt",
+      "description": "PID saturation pre-feedfroward - torque",
+      "type": "FLOAT32",
+      "size": 1
+    },
+     {
+      "name": "kfft",
+      "description": "feedforward gain torque",
+      "type": "FLOAT32",
+      "size": 1
+     },
+   {
+      "name": "maxt",
+      "description": "Maximum output - torque",
+      "type": "FLOAT32",
+      "size": 1
+    },
+   {
+      "name": "kt",
+      "description": "torque constant",
+      "type": "FLOAT32",
+      "size": 1
+    }
+  ]
+}

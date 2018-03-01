@@ -1,0 +1,25 @@
+{
+  "name": "QEI_DeltaConfiguration",
+  "description": "QEI_Delta",
+  "namespace": "@",
+  "fields": [
+    {
+      "name": "period",
+      "description": "Update period [ms]",
+      "type": "UINT16",
+      "size": 1
+    },
+    {
+      "name": "ticks",
+      "description": "Number of ticks per revolution",
+      "type": "FLOAT32",
+      "size": 1
+    },
+    {
+      "name": "invert",
+      "description": "Invert rotation direction",
+      "type": "UINT8",
+      "size": 1
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "name": "EdoJointCtrl",
+  "description": "Edo Joint Ctrl message structure",
+  "namespace": "@",
+  "fields": [
+    {
+      "name": "position",
+      "description": "Position component",
+      "type": "FLOAT32",
+      "size": 1
+    },
+    {
+      "name": "velocity",
+      "description": "Velocity component",
+      "type": "FLOAT32",
+      "size": 1
+    },
+    {
+      "name": "acceleration",
+      "description": "Acceleration component",
+      "type": "FLOAT32",
+      "size": 1
+    },
+    {
+      "name": "feedfwvelocity",
+      "description": "FeedFw Velocity component",
+      "type": "FLOAT32",
+      "size": 1
+    },
+    {
+      "name": "feedfwtorque",
+      "description": "FeedFw Torque component",
+      "type": "FLOAT32",
+      "size": 1
+    }
+  ]
+}

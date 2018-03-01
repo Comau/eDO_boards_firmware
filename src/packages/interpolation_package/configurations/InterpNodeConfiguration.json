@@ -1,0 +1,13 @@
+{
+  "name": "InterpNodeConfiguration",
+  "description": "Interpolation node configuration",
+  "namespace": "@",
+  "fields": [
+    {
+      "name": "dummy",
+      "description": "Dummy",
+      "type": "UINT16",
+      "size": 1
+    }
+  ]
+}

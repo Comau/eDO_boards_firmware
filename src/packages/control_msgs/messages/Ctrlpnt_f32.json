@@ -1,0 +1,25 @@
+{
+  "name": "Ctrlpnt_f32",
+  "description": "Control point for PIDs",
+  "namespace": "@",
+  "fields": [
+    {
+      "name": "value",
+      "description": "Reference value",
+      "type": "FLOAT32",
+      "size": 1
+    },
+    {
+      "name": "ffv",
+      "description": "FeedForward Velocity",
+      "type": "FLOAT32",
+      "size": 1
+    },
+    {
+      "name": "fft",
+      "description": "FeedForward Torque",
+      "type": "FLOAT32",
+      "size": 1
+    }
+  ]
+}

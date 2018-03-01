@@ -1,0 +1,31 @@
+{
+  "name": "DynamixelRegisterMsg",
+  "description": "TODO",
+  "namespace": "@",
+  "fields": [
+    {
+      "name": "id",
+      "description": "TODO",
+      "type": "UINT8",
+      "size": 1
+    },
+    {
+      "name": "address",
+      "description": "TODO",
+      "type": "UINT8",
+      "size": 1
+    },
+    {
+      "name": "length",
+      "description": "TODO",
+      "type": "UINT8",
+      "size": 1
+    },
+    {
+      "name": "data",
+      "description": "TODO",
+      "type": "UINT16",
+      "size": 1
+    }
+  ]
+}

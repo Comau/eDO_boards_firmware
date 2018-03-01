@@ -1,0 +1,1 @@
+SUBSYSTEM=="tty", SUBSYSTEMS=="usb", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="caca", RUN+="/tmp/run_at_usb_bootloader_connect.sh", SYMLINK+="usb_bootloader"

@@ -1,0 +1,5 @@
+{
+  "name": "QEI_driver",
+  "description": "QEI sensor driver",
+  "provider": "core"
+}

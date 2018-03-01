@@ -1,0 +1,37 @@
+{
+  "name": "DynamixelStateMsg",
+  "description": "TODO",
+  "namespace": "@",
+  "fields": [
+    {
+      "name": "position",
+      "description": "TODO",
+      "type": "FLOAT32",
+      "size": 1
+    },
+    {
+      "name": "id",
+      "description": "TODO",
+      "type": "UINT8",
+      "size": 1
+    },
+    {
+      "name": "error",
+      "description": "TODO",
+      "type": "UINT8",
+      "size": 1
+    },
+    {
+      "name": "is_moving",
+      "description": "TODO",
+      "type": "UINT8",
+      "size": 1
+    },
+    {
+      "name": "temperature",
+      "description": "TODO",
+      "type": "UINT8",
+      "size": 1
+    }
+  ]
+}

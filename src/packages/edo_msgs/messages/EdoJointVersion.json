@@ -1,0 +1,37 @@
+{
+  "name": "EdoJointVersion",
+  "description": "Edo Joint Version message structure",
+  "namespace": "@",
+  "fields": [
+    {
+      "name": "id",
+      "description": "Joint ID",
+      "type": "INT8",
+      "size": 1
+    },
+    {
+      "name": "major",
+      "description": "Major release",
+      "type": "UINT8",
+      "size": 1
+    },
+    {
+      "name": "minor",
+      "description": "Minor release",
+      "type": "UINT16",
+      "size": 1
+    },
+    {
+      "name": "revision",
+      "description": "Revision release",
+      "type": "UINT16",
+      "size": 1
+    },
+    {
+      "name": "svn",
+      "description": "Source control revision number",
+      "type": "UINT16",
+      "size": 1
+    }
+  ]
+}

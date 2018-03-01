@@ -1,0 +1,25 @@
+{
+  "name": "DynamixelCommandMsg",
+  "description": "TODO",
+  "namespace": "@",
+  "fields": [
+    {
+      "name": "position",
+      "description": "TODO",
+      "type": "FLOAT32",
+      "size": 1
+    },
+    {
+      "name": "id",
+      "description": "TODO",
+      "type": "UINT8",
+      "size": 1
+    },
+    {
+      "name": "speed",
+      "description": "TODO",
+      "type": "UINT16",
+      "size": 1
+    }
+  ]
+}

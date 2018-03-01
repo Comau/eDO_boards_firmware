@@ -1,0 +1,11 @@
+{
+  "name": "edo-gripper_bootloader",
+  "description": "Bootloader for e.DO gripper controller",
+  "chip": "STM32F091CB",
+  "required_packages": [],
+  "chibios_components": [
+    "nil",
+    "hal",
+    "pal"
+  ]
+}

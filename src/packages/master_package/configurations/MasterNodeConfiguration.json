@@ -1,0 +1,19 @@
+{
+  "name": "MasterNodeConfiguration",
+  "description": "Masterl node configuration",
+  "namespace": "@",
+  "fields": [
+    {
+      "name": "Configured",
+      "description": "Am I configured or not",
+      "type": "INT8",
+      "size": 1
+    },
+    {
+      "name": "Reduction",
+      "description": "Motor reduction ratio",
+      "type": "FLOAT32",
+      "size": 1
+    }
+  ]
+}

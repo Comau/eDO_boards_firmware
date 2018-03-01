@@ -1,0 +1,5 @@
+{
+  "name": "control_pid",
+  "description": "PID controller",
+  "provider": "core"
+}

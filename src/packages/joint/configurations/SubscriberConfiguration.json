@@ -1,0 +1,13 @@
+{
+  "name": "SubscriberConfiguration",
+  "description": "Joint Subscriber node configuration",
+  "namespace": "@",
+  "fields": [
+    {
+      "name": "topic",
+      "description": "Name of the topic to subscribe to",
+      "type": "CHAR",
+      "size": 16
+    }
+  ]
+}

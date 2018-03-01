@@ -1,0 +1,25 @@
+{
+  "name": "EdoJointInit",
+  "description": "Edo Joint Init message structure",
+  "namespace": "@",
+  "fields": [
+    {
+      "name": "joints_mask",
+      "description": "Mask of joints",
+      "type": "UINT64",
+      "size": 1
+    },
+    {
+      "name": "mode",
+      "description": "Init mode",
+      "type": "UINT8",
+      "size": 1
+    },
+    {
+      "name": "reduction",
+      "description": "Reduction ratio",
+      "type": "FLOAT32",
+      "size": 1
+    }
+  ]
+}

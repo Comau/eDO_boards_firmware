@@ -1,0 +1,25 @@
+{
+  "name": "DynamixelScanMsg",
+  "description": "TODO",
+  "namespace": "@",
+  "fields": [
+    {
+      "name": "id",
+      "description": "TODO",
+      "type": "UINT8",
+      "size": 1
+    },
+    {
+      "name": "firmware",
+      "description": "TODO",
+      "type": "UINT8",
+      "size": 1
+    },
+    {
+      "name": "model",
+      "description": "TODO",
+      "type": "UINT16",
+      "size": 1
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "name": "dynamixel_driver",
+  "description": "Dynamixel driver",
+  "provider": "core"
+}

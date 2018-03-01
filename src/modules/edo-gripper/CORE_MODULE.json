@@ -1,0 +1,22 @@
+{
+  "name": "edo-gripper",
+  "description": "Gripper controller for e.DO",
+  "chip": "STM32F091CB",
+  "required_packages": [
+    "stm32_flash",
+    "stm32_crc",
+    "dynamixel_driver",
+    "snippets"
+  ],
+  "chibios_components": [
+    "rt",
+    "hal",
+    "pal",
+    "i2c",
+    "serial",
+    "uart",
+    "chprintf",
+    "shell",
+    "syscalls"
+  ]
+}

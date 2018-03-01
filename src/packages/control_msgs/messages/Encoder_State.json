@@ -1,0 +1,31 @@
+{
+  "name": "Encoder_State",
+  "description": "encoder position and velocity",
+  "namespace": "@",
+  "fields": [
+    {
+      "name": "position",
+      "description": "angular position",
+      "type": "FLOAT32",
+      "size": 1
+    },
+    {
+      "name": "velocity",
+      "description": "angular velocity",
+      "type": "FLOAT32",
+      "size": 1
+    },
+    {
+      "name": "current",
+      "description": "motor current",
+      "type": "FLOAT32",
+      "size": 1
+    },
+    {
+      "name": "commandFlag",
+      "description": "ack command flag",
+      "type": "UINT8",
+      "size": 1
+    }
+  ]
+}

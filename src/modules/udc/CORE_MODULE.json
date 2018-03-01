@@ -1,0 +1,20 @@
+{
+  "name": "udc",
+  "description": "uDC",
+  "chip": "STM32F303CC",
+  "required_packages": [
+    "stm32_qei",
+    "stm32_flash",
+    "stm32_crc",
+    "snippets"
+  ],
+  "chibios_components": [
+    "rt",
+    "hal",
+    "adc",
+    "ext",
+    "pal",
+    "pwm",
+    "syscalls"
+  ]
+}

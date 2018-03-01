@@ -1,0 +1,13 @@
+{
+  "name": "EdoJointCalibration",
+  "description": "Edo Joint Calibration message structure",
+  "namespace": "@",
+  "fields": [
+    {
+      "name": "joints_mask",
+      "description": "Mask of joints",
+      "type": "UINT64",
+      "size": 1
+    }
+  ]
+}

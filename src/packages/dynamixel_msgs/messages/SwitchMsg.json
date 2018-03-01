@@ -1,0 +1,13 @@
+{
+  "name": "SwitchMsg",
+  "description": "TODO",
+  "namespace": "@",
+  "fields": [
+    {
+      "name": "state",
+      "description": "TODO",
+      "type": "UINT32",
+      "size": 1
+    }
+  ]
+}

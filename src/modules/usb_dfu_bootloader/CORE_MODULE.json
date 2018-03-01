@@ -1,0 +1,14 @@
+{
+  "name": "usb_dfu_bootloader",
+  "description": "USB DFU bootloader",
+  "chip": "STM32F303CC",
+  "required_packages": [],
+  "chibios_components": [
+    "nil",
+    "hal",
+    "pal",
+    "serial_usb",
+    "hal_buffers",
+    "usb"
+  ]
+}

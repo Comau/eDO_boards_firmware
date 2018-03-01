@@ -1,0 +1,5 @@
+{
+  "name": "master_package",
+  "description": "master node",
+  "provider": "core"
+}
