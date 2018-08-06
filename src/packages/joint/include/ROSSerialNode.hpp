@@ -13,6 +13,11 @@
 #include <core/common_msgs/Float32.hpp>
 #include <string.h>
 #include <ros.h>
+#ifndef MAX_JOINTS
+// See also Joint.hpp
+#define MAX_JOINTS  7  /* Create a limited amount of node servers on the USB board */
+#define JOINT_MASK  0x0000000000000007F /* Mask consistent with the MAX_JOINT definition */
+#endif
 #include <core/joint/Joint.hpp>
 #include <edo_core_msgs/JointControl.h>
 #include <edo_core_msgs/JointControlArray.h>
@@ -33,9 +38,19 @@
 #include <edo_core_msgs/JointFwVersionArray.h>
 #include <std_msgs/UInt8.h>
 
-#define MAX_JOINTS	10
-#define JOINT_MASK	0x000000000000003FF
-
+// Nibbe basso: codifica su 4 bits
+#define J_STATE_ACK_INIT      1
+#define J_STATE_ACK_CALIB     2
+#define J_STATE_ACK_CONFIG    3
+#define J_STATE_ACK_RESET     4
+#define J_STATE_ACK_VERSION   5
+#define J_STATE_ACK_MASK      0x0F
+// Nibble alto: viene invece gestito a singolo bit
+#define J_STATE_SPARE         4  // Bit XXXY.ZZZZ Not used
+#define J_STATE_UNDERVOLTAGE  5  // Bit XXYX.ZZZZ  0x20 --  32
+#define J_STATE_OVERCURRENT   6  // Bit XYXX.ZZZZ  0x40 --  64
+#define J_STATE_UNCALIB       7  // Bit YXXX.ZZZZ  0x80 -- 128
+#define J_STATE_ERR_MASK      0x40 // Filter one error only (OVERCURRENT)
 
 namespace core {
 namespace joint {
@@ -121,9 +136,8 @@ private:
 	edo_core_msgs::JointStateArray _jnt_state_pub_msg;
 	
 	bool _initialized;
-	uint64_t _joints_mask;
-	uint8_t _number_of_joints;
-	
+	uint32_t _joints_mask;
+	uint8_t _number_of_joints;  // E' in realta' l'indice dell'ultimo giunto
 	core::os::Time _last_publish_timestamp;
 	
 	core::mw::CoreNodeManager joints_manager;
@@ -134,7 +148,7 @@ private:
 	bool startStopJoints(uint8_t ids_array[], uint8_t number_of_joints);
 	
 	uint8_t
-	getJointIDsFromMask(uint64_t mask, uint8_t ids_array[], uint8_t size);
+	getJointIDsFromMask(uint32_t mask, uint8_t ids_array[], uint8_t size);
 	
 	bool
 	onConfigure();

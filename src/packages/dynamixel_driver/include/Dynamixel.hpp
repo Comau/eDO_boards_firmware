@@ -192,40 +192,79 @@ public:
 
     bool
     setPosition(
-        float position
+        uint16_t position
     );
 
     bool
     setSpeed(
-        float speed
+        uint16_t speed
     );
 
     bool
     setTorqueLimit(
-        float torque
+        uint16_t torque
+    );
+
+    bool
+    setAngleLimit(
+        bool isCW,
+        uint16_t data
     );
 
     uint8_t
     getId();
 
     uint16_t
-    getModel();
+    getModel(bool *pb_state);
 
     uint8_t
-    getFirmware();
+    getFirmware(bool *pb_state);
 
     uint16_t
-    getPosition();
+    getPosition(bool *pb_state);
 
     uint8_t
-    getTemperature();
+    getTemperature(bool *pb_state);
 
     uint8_t
     getError();
 
     uint8_t
-    getIsMoving();
+    getIsMoving(bool *pb_state);
 
+    uint16_t
+    getCurrentLoad(bool *pb_state); /* 180315 GC Added */
+
+    uint16_t
+    getMaxTorque(bool *pb_state); /* 180511 GC Added */
+
+    uint16_t
+    getTorqueLimit(bool *pb_state); /* 180511 GC Added */
+
+    uint16_t
+    getAngleLimit(bool *pb_state, bool isCW); /* 180511 GC Added */
+
+    bool
+    setComplianceMargin(
+        bool    isCW,
+        uint8_t data
+    );
+
+    bool
+    setComplianceSlope(
+        bool    isCW,
+        uint8_t data
+    );
+
+    bool
+    setPunch(
+        uint16_t data
+    );
+    
+    bool
+    setAlarmShutdown(
+        uint8_t data
+    );
 
 private:
     Network& _net;

@@ -98,16 +98,16 @@ Network::write(
 
     _buffer[len + 3] = ~checksum;
 
-    chThdSleepMilliseconds(1);
+    //chThdSleepMilliseconds(1);
     _tx_enable.set();// TX MODE
-    chThdSleepMilliseconds(1);
+    chThdSleepMicroseconds(100);//chThdSleepMilliseconds(1);
     sdWrite(_sdp, _buffer, len + 4);
 #if READ_BACK_ON_WRITE
     sdRead(_sdp, _buffer, len + 4);
 #endif
-    chThdSleepMilliseconds(1);
+    chThdSleepMicroseconds(100);// chThdSleepMilliseconds(1);
     _tx_enable.clear();// RX MODE
-    chThdSleepMilliseconds(1);
+    // chThdSleepMilliseconds(1);
 } // Network::write
 
 void
@@ -137,8 +137,8 @@ Network::readData(
     chSysUnlock();
 
     write(id, 4);
-    read(id, len + 2);
-
+    if (read(id, len + 2) == false)
+      return((uint8_t*)NULL);
     return &_buffer[4];
 }
 
@@ -316,57 +316,43 @@ Servo::setLed(
 
 bool
 Servo::setPosition(
-    float position
+  uint16_t goal_position
 )
 {
-	if(position < 0.0f) {
-		position = 0.0f;
-	}
+  if (goal_position > 1023) {
+    goal_position = 1023;
+  }
 
-	position *= 1024.0f / 300.0f;
+  _net.writeData(_id, GOAL_POSITION_L, (uint8_t*)&goal_position, 2);
 
-	uint16_t goal_position = position;
-
-    if(goal_position > 1023) {
-    	goal_position = 1023;
-    };
-
-    _net.writeData(_id, GOAL_POSITION_L, (uint8_t*)&goal_position, 2);
-
-    return true;
+  return true;
 }
 
 bool
 Servo::setSpeed(
-    float speed
+    uint16_t current_speed
 )
 {
-	if(speed < 0.0f) {
-		speed = 0.0f;
-	}
+  if (current_speed > 1023) {
+    current_speed = 0;
+  }
 
-	speed /= 0.111f;
+  _net.writeData(_id, MOVING_SPEED_L, (uint8_t*)&current_speed, 2);
 
-    uint16_t current_speed = speed;
-
-    if(current_speed > 1023) {
-    	current_speed = 0;
-    };
-
-    _net.writeData(_id, MOVING_SPEED_L, (uint8_t*)&current_speed, 2);
-
-    return true;
+  return true;
 }
 
 bool
 Servo::setTorqueLimit(
-    float torque
+    uint16_t current_torque
 )
 {
-    // TODO: implement
-    (void)torque;
+    if (current_torque > 1023) {
+      current_torque = 0;
+    }
+    _net.writeData(_id, TORQUE_LIMIT_L, (uint8_t*)&current_torque, 2);
 
-    return false;
+    return true;
 }
 
 uint8_t
@@ -376,43 +362,68 @@ Servo::getId()
 }
 
 uint16_t
-Servo::getModel()
+Servo::getModel(bool *pb_state)
 {
-    uint8_t* tmp = _net.readData(_id, MODEL_NUMBER_L, 2);
-
-    return tmp[2] << 8 | tmp[1];
+  uint8_t* tmp = _net.readData(_id, MODEL_NUMBER_L, 2);
+  if (tmp == (uint8_t*)NULL)
+  {
+    *pb_state = false;
+    return 0;
+  }
+  *pb_state = true;
+  return tmp[2] << 8 | tmp[1];
 }
 
 uint8_t
-Servo::getFirmware()
+Servo::getFirmware(bool *pb_state)
 {
-    uint8_t* tmp = _net.readData(_id, FIRMWARE_VERSION, 1);
-
-    return tmp[1];
+  uint8_t* tmp = _net.readData(_id, FIRMWARE_VERSION, 1);
+  if (tmp == (uint8_t*)NULL)
+  {
+    *pb_state = false;
+    return 0;
+  }
+  *pb_state = true;
+  return tmp[1];
 }
 
 uint16_t
-Servo::getPosition()
+Servo::getPosition(bool *pb_state)
 {
     uint8_t* tmp = _net.readData(_id, PRESENT_POSITION_L, 2);
-
+    if (tmp == (uint8_t*)NULL)
+    {
+      *pb_state = false;
+      return 0;
+    }
+    *pb_state = true;
     return tmp[2] << 8 | tmp[1];
 }
 
 uint8_t
-Servo::getIsMoving()
+Servo::getIsMoving(bool *pb_state)
 {
     uint8_t* tmp = _net.readData(_id, MOVING, 1);
-
+    if (tmp == (uint8_t*)NULL)
+    {
+      *pb_state = false;
+      return 0;
+    }
+    *pb_state = true;
     return tmp[1];
 }
 
 uint8_t
-Servo::getTemperature()
+Servo::getTemperature(bool *pb_state)
 {
-    uint8_t* tmp = _net.readData(_id, PRESENT_TEMPERATURE, 1);
-
-    return tmp[1];
+  uint8_t* tmp = _net.readData(_id, PRESENT_TEMPERATURE, 1);
+  if (tmp == (uint8_t*)NULL)
+  {
+    *pb_state = false;
+    return 0;
+  }
+  *pb_state = true;
+  return tmp[1];
 }
 
 uint8_t
@@ -424,5 +435,126 @@ Servo::getError()
 
     return error;
 }
+/* 180315 GC Added */
+uint16_t Servo::getCurrentLoad(bool *pb_state)
+{
+  uint8_t* tmp = _net.readData(_id, PRESENT_LOAD_L, 2);
+  if (tmp == (uint8_t*)NULL)
+  {
+    *pb_state = false;
+    return 0;
+  }
+  *pb_state = true;
+  return tmp[2] << 8 | tmp[1];
+}
+uint16_t
+Servo::getMaxTorque(bool *pb_state)
+{
+  uint8_t* tmp = _net.readData(_id, MAX_TORQUE_L, 2);
+  if (tmp == (uint8_t*)NULL)
+  {
+    *pb_state = false;
+    return 0;
+  }
+  *pb_state = true;
+  return tmp[2] << 8 | tmp[1];
+}
+uint16_t
+Servo::getTorqueLimit(bool *pb_state)
+{
+  uint8_t* tmp = _net.readData(_id, TORQUE_LIMIT_L, 2);
+  if (tmp == (uint8_t*)NULL)
+  {
+    *pb_state = false;
+    return 0;
+  }
+  *pb_state = true;
+  return tmp[2] << 8 | tmp[1];
+}
+
+uint16_t
+Servo::getAngleLimit(bool *pb_state, bool isCW) /* 180511 GC Added */
+{
+  uint8_t* tmp;
+  
+  if (isCW == true)
+  {
+    tmp = _net.readData(_id, CW_ANGLE_LIMIT_L, 2);
+  }
+  else
+  {
+    tmp = _net.readData(_id, CCW_ANGLE_LIMIT_L, 2);
+  }
+  if (tmp == (uint8_t*)NULL)
+  {
+    *pb_state = false;
+    return 0;
+  }
+  *pb_state = true;
+  return tmp[2] << 8 | tmp[1];
+}
+
+bool
+Servo::setComplianceMargin(bool isCW, uint8_t data)
+{
+  if (isCW == true)
+  {
+    _net.writeData(_id, CW_COMPLIANCE_MARGIN, (uint8_t*)&data, 1);
+  }
+  else
+  {
+    _net.writeData(_id, CCW_COMPLIANCE_MARGIN, (uint8_t*)&data, 1);
+  }
+
+  return true;
+}
+bool
+Servo::setComplianceSlope(bool isCW, uint8_t data)
+{
+  if (isCW == true)
+  {
+    _net.writeData(_id, CW_COMPLIANCE_SLOPE, (uint8_t*)&data, 1);
+  }
+  else
+  {
+    _net.writeData(_id, CCW_COMPLIANCE_SLOPE, (uint8_t*)&data, 1);
+  }
+
+  return true;
+}
+bool
+Servo::setPunch(
+    uint16_t data
+)
+{
+  if (data > 1023) {
+    data = 32;
+  }
+  _net.writeData(_id, PUNCH_L, (uint8_t*)&data, 2);
+
+  return true;
+}
+bool
+Servo::setAngleLimit(bool isCW, uint16_t data)
+{
+  if (isCW == true)
+  {
+    _net.writeData(_id, CW_ANGLE_LIMIT_L, (uint8_t*)&data, 2);
+  }
+  else
+  {
+    _net.writeData(_id, CCW_ANGLE_LIMIT_L, (uint8_t*)&data, 2);
+  }
+
+  return true;
+}
+bool
+Servo::setAlarmShutdown(uint8_t data)
+{
+  _net.writeData(_id, ALARM_SHUTDOWN, (uint8_t*)&data, 1);
+  return true;
+}
+
 }
 }
+

@@ -18,15 +18,15 @@
 #include <core/dynamixel_driver/Dynamixel.hpp>
 
 // LED
-using LED_PAD = core::hw::Pad_<core::hw::GPIO_A, 4>;
+using LED_PAD = core::hw::Pad_<core::hw::GPIO_A, 2>;
 static LED_PAD _led;
 
 // YELLOW LED and TX_EN
-static core::hw::Pad_<core::hw::GPIO_A, 5> _led_red;
-static core::hw::Pad_<core::hw::GPIO_A, 1> _tx_enable;
+static core::hw::Pad_<core::hw::GPIO_A, 1> _led_red;
+static core::hw::Pad_<core::hw::GPIO_A, 3> _tx_enable;
 
 // SERVO NETWORK
-static core::dynamixel_driver::Network _servo_network(&SD2, _tx_enable);
+static core::dynamixel_driver::Network _servo_network(&SD6, _tx_enable);
 
 // MODULE DEVICES
 core::hw::Pad& Module::led_red = _led_red;

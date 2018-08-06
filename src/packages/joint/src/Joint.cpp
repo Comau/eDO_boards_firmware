@@ -21,15 +21,16 @@ Joint::Joint(
     CoreConfigurable(name),
     _id(id)
 {
-	_workingAreaSize = 128;
+	_workingAreaSize = 256;
 	_pos = 0.0;
 	_vel = 0.0;
 	_current = 0.0;
 	_commandFlag = 0;
+	_commandFlagPrev = 0;
 	_state_updated = false;
-	sprintf(_state_topic, "j%d_state", id);
-	sprintf(_ctrl_topic, "j%d_setpnt", id);
-	sprintf(_config_topic, "j%d_param", id);
+	sprintf(_state_topic,   "j%d_state",   id);
+	sprintf(_ctrl_topic,    "j%d_setpnt",  id);
+	sprintf(_config_topic,  "j%d_param",   id);
 	sprintf(_version_topic, "j%d_version", id);
 }
 
@@ -51,8 +52,8 @@ Joint::onPrepareMW()
 	this->subscribe(_subscriber_state, _state_topic);
 	this->advertise(_publisher_ctrl, _ctrl_topic);
 	this->advertise(_publisher_config, _config_topic);
-	_subscriber_version.set_callback(Joint::callback_version_);
-	this->subscribe(_subscriber_version, _version_topic);
+	// _subscriber_version.set_callback(Joint::callback_version_);
+	// this->subscribe(_subscriber_version, _version_topic);
 	
 	return true;
 }
@@ -85,15 +86,15 @@ Joint::callback_state_(
     void*                             context
 )
 {
-    Joint* _this = static_cast<Joint*>(context);
+  Joint* _this = static_cast<Joint*>(context);
 
-    _this->_pos = msg.position;
-	_this->_vel = msg.velocity;
-	_this->_current = msg.current;
-	_this->_commandFlag = msg.commandFlag;
-	_this->_state_updated = true;
+  _this->_pos = msg.position;
+  _this->_vel = msg.velocity;
+  _this->_current = msg.current;
+  _this->_commandFlag = msg.commandFlag;
+  _this->_state_updated = true;
 
-    return true;
+  return true;
 }
 
 bool
@@ -106,17 +107,17 @@ Joint::callback_version_(
 
     if(_this->_rosNode != nullptr){
 
-    	_this->_rosNode->_jnt_fw_version_pub_msg.id = msg.id;
-    	_this->_rosNode->_jnt_fw_version_pub_msg.majorRev = msg.major;
-    	_this->_rosNode->_jnt_fw_version_pub_msg.minorRev = msg.minor;
-    	_this->_rosNode->_jnt_fw_version_pub_msg.revision = msg.revision;
-    	_this->_rosNode->_jnt_fw_version_pub_msg.svn = msg.svn;
+      _this->_rosNode->_jnt_fw_version_pub_msg.id = msg.id;
+      _this->_rosNode->_jnt_fw_version_pub_msg.majorRev = msg.major;
+      _this->_rosNode->_jnt_fw_version_pub_msg.minorRev = msg.minor;
+      _this->_rosNode->_jnt_fw_version_pub_msg.revision = msg.revision;
+      _this->_rosNode->_jnt_fw_version_pub_msg.svn = msg.svn;
 
-		if(_this->_rosNode->_jnt_fw_version_pub != nullptr)
-			return _this->_rosNode->_jnt_fw_version_pub->publish(&_this->_rosNode->_jnt_fw_version_pub_msg);
+      if (_this->_rosNode->_jnt_fw_version_pub != nullptr)
+        return _this->_rosNode->_jnt_fw_version_pub->publish(&_this->_rosNode->_jnt_fw_version_pub_msg);
     }
 
-    return false;
+    return true;
 }
 
 void
@@ -141,6 +142,14 @@ Joint::setStateUpdated(
 )
 {
 	_state_updated = updated;
+}
+
+void 
+Joint::setCommandFlagPrev(
+    const uint8_t & updated
+)
+{
+	_commandFlagPrev = updated;
 }
 
 const bool &
@@ -213,6 +222,25 @@ const float & Joint::getCurrent()
 const uint8_t & Joint::getCommandFlag()
 {
 	return _commandFlag;
+}
+
+const uint8_t & Joint::getCommandFlagPrev()
+{
+	return _commandFlagPrev;
+}
+
+static const char *spc_msgTypes[] = {
+  "J ACK(%d) te %d", 
+  "J ACK(%d) fe %d",
+  "J ERR(%d) te %d",
+  "J ERR(%d) fe %d",
+  "J STATE(%d)  %d"
+};
+
+const char * Joint::compileLogInfoMsg(uint8_t msgType, uint8_t data)
+{
+	sprintf(_msg, spc_msgTypes[msgType], data, _id);
+	return &(_msg[0]);
 }
 
 void Joint::set_ros_node(core::joint::ROSSerialNode  *node_ptr)

@@ -2,6 +2,7 @@
  *
  */
 
+#include "hal.h"   // Just for using the yellow led
 #include <ModuleConfiguration.hpp>
 #include <Module.hpp>
 #include <ros.h>
@@ -49,49 +50,58 @@ core::led::SubscriberConfiguration led_subscriber_configuration_default;
 core::led::Publisher  led_publisher("led_pub", core::os::Thread::PriorityEnum::LOWEST);
 core::led::Subscriber led_subscriber("led_sub", core::os::Thread::PriorityEnum::LOWEST);
 core::joint::Joint staticJoints[MAX_JOINTS] = {
-	{"j1", core::os::Thread::PriorityEnum::NORMAL, 1},
-	{"j2", core::os::Thread::PriorityEnum::NORMAL, 2},
-	{"j3", core::os::Thread::PriorityEnum::NORMAL, 3},
-	{"j4", core::os::Thread::PriorityEnum::NORMAL, 4},
-	{"j5", core::os::Thread::PriorityEnum::NORMAL, 5},
-	{"j6", core::os::Thread::PriorityEnum::NORMAL, 6},
-	{"j7", core::os::Thread::PriorityEnum::NORMAL, 7},
-	{"j8", core::os::Thread::PriorityEnum::NORMAL, 8},
-	{"j9", core::os::Thread::PriorityEnum::NORMAL, 9},
-	{"j10", core::os::Thread::PriorityEnum::NORMAL, 10}
-	};
+   {"j1", core::os::Thread::PriorityEnum::NORMAL, 1}
+#if MAX_JOINTS > 1
+  ,{"j2", core::os::Thread::PriorityEnum::NORMAL, 2}
+#if MAX_JOINTS > 2
+  ,{"j3", core::os::Thread::PriorityEnum::NORMAL, 3}
+#if MAX_JOINTS > 3
+  ,{"j4", core::os::Thread::PriorityEnum::NORMAL, 4}
+#if MAX_JOINTS > 4
+  ,{"j5", core::os::Thread::PriorityEnum::NORMAL, 5}
+#if MAX_JOINTS > 5
+  ,{"j6", core::os::Thread::PriorityEnum::NORMAL, 6}
+#if MAX_JOINTS > 6
+  ,{"j7", core::os::Thread::PriorityEnum::NORMAL, 7}
+#endif
+#endif
+#endif
+#endif
+#endif
+#endif
+};
 core::joint::ROSSerialNode ros_node(staticJoints, "ros_serial_node", core::os::Thread::PriorityEnum::NORMAL);
 
 // --- DEVICE CONFIGURATION ---------------------------------------------------
 
 void msg_jnt_ctrl_cb(const edo_core_msgs::JointControlArray& msg)
 {
-	ros_node.callback_ros_jntctrl_(msg);
+  ros_node.callback_ros_jntctrl_(msg);
 }
 
 void msg_jnt_config_cb(const edo_core_msgs::JointConfigurationArray& msg)
 {
-	ros_node.callback_ros_jntconfig_(msg);
+  ros_node.callback_ros_jntconfig_(msg);
 }
 
 void msg_jnt_init_cb(const edo_core_msgs::JointInit& msg)
 {
-	ros_node.callback_ros_jntinit_(msg);
+  ros_node.callback_ros_jntinit_(msg);
 }
 
 void msg_jnt_calibration_cb(const edo_core_msgs::JointCalibration& msg)
 {
-	ros_node.callback_ros_jntcalib_(msg);
+  ros_node.callback_ros_jntcalib_(msg);
 }
 
 void msg_jnt_reset_cb(const edo_core_msgs::JointReset& msg)
 {
-	ros_node.callback_ros_jntreset_(msg);
+  ros_node.callback_ros_jntreset_(msg);
 }
 
 void msg_jnt_version_cb(const std_msgs::UInt8 & msg)
 {
-	ros_node.callback_ros_jntversion_(msg);
+  ros_node.callback_ros_jntversion_(msg);
 }
 
 ros::Subscriber<edo_core_msgs::JointControlArray> subObjCtrl("algo_jnt_ctrl", &msg_jnt_ctrl_cb);
@@ -109,7 +119,7 @@ extern "C" {
         void
     )
     {
-		
+
         module.initialize();
 
         // Device configurations
@@ -119,17 +129,17 @@ extern "C" {
         led_publisher_configuration_default.led    = 1;
         led_subscriber_configuration_default.topic = "led";
 
-		ros_node.setCtrlSub(&subObjCtrl);
-		ros_node.setConfigSub(&subObjConfig);
-		ros_node.setInitSub(&subObjInit);
-		ros_node.setCalibSub(&subObjCalib);
-		ros_node.setResetSub(&subObjReset);
-		ros_node.setVersionSub(&subObjVersion);
+        ros_node.setCtrlSub(&subObjCtrl);
+        ros_node.setConfigSub(&subObjConfig);
+        ros_node.setInitSub(&subObjInit);
+        ros_node.setCalibSub(&subObjCalib);
+        ros_node.setResetSub(&subObjReset);
+        ros_node.setVersionSub(&subObjVersion);
 
-		for (uint8_t j = 0; j < MAX_JOINTS; j++)
-		{
-			staticJoints[j].set_ros_node(&ros_node);
-		}
+        for (uint8_t j = 0; j < MAX_JOINTS; j++)
+        {
+          staticJoints[j].set_ros_node(&ros_node);
+        }
 
         // Add configurable objects to the configuration manager...
         module.configurations().add(led_publisher, led_publisher_configuration_default);
@@ -141,12 +151,12 @@ extern "C" {
         // Add nodes to the node manager...
         module.nodes().add(led_publisher);
         module.nodes().add(led_subscriber);
-		module.nodes().add(ros_node);
-		
+        module.nodes().add(ros_node);
+
         // ... and let's play!
         module.nodes().setup();
         module.nodes().run();
-
+        palSetPad(GPIOA,3); // set del led giallo
         // Is everything going well?
         for (;;) {
             if (!module.nodes().areOk()) {

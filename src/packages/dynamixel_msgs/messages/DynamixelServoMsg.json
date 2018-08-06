@@ -1,0 +1,37 @@
+{
+  "name": "DynamixelServoMsg",
+  "description": "From dynamixel node to proxy node. Current Position and Current Load",
+  "namespace": "@",
+  "fields": [
+    {
+      "name": "id",
+      "description": "Dynamixel module identifier",
+      "type": "UINT8",
+      "size": 1
+    },
+    {
+      "name": "currentPosition",
+      "description": "PresentPosition@0x24",
+      "type": "UINT16",
+      "size": 1
+    },
+    {
+      "name": "currentSpeed",
+      "description": "PresentSpeed@0x26",
+      "type": "UINT16",
+      "size": 1
+    },
+    {
+      "name": "currentLoad",
+      "description": "PresentLoad@0x28",
+      "type": "UINT16",
+      "size": 1
+    },
+    {
+      "name": "currentTemperature",
+      "description": "PresentTemperature@0x2B",
+      "type": "UINT16",
+      "size": 1
+    }
+  ]
+}

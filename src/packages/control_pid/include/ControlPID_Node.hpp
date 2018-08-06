@@ -26,16 +26,20 @@
 #include <core/control_pid/PID2.hpp>
 #include <comau_edo/edo_msgs/EdoJointVersion.hpp>
 
-#define J_STATE_ACK_INIT		1
-#define J_STATE_ACK_CALIB		2
-#define J_STATE_ACK_CONFIG		3
-#define J_STATE_ACK_RESET		4
-#define J_STATE_ACK_VERSION		5
-// bits
-#define J_STATE_UNDERVOLTAGE		5
-#define J_STATE_OVERCURRENT		6
-#define J_STATE_UNCALIB			7
+// Nibbe basso: codifica su 4 bits
+#define J_STATE_ACK_INIT      1
+#define J_STATE_ACK_CALIB     2
+#define J_STATE_ACK_CONFIG    3
+#define J_STATE_ACK_RESET     4
+#define J_STATE_ACK_VERSION   5
+#define J_STATE_ACK_MASK      0x0F
+// Nibble alto: viene invece gestito a singolo bit
+#define J_STATE_SPARE         4  // Bit XXXY.ZZZZ Not used
+#define J_STATE_UNDERVOLTAGE  5  // Bit XXYX.ZZZZ
+#define J_STATE_OVERCURRENT   6  // Bit XYXX.ZZZZ
+#define J_STATE_UNCALIB       7  // Bit YXXX.ZZZZ
 
+#define J_STATE_ACK_CYCLES    30
 
 // --- DEFINITION -------------------------------------------------------------
 namespace core {
@@ -72,6 +76,8 @@ public:
 	setack(const uint8_t flag);
 	
     void setStatusMask(const uint8_t bit, const bool set);
+
+    float recoveryMove(float vr_DeltaPos, float vr_T);
 
     void
     disengage_brake(const uint32_t & time, const float & offset);
@@ -155,10 +161,14 @@ private:
     char _topic_param[16];						//Topic name to receive PID parameters
     char _topic_version[16];					//Topic name to publish firmware version
 
-
     core::os::Time _last_encoder_timestamp;
     core::os::Time _last_encoder_measure;
     core::os::Time _last_supply_drop_timestamp;
+    core::os::Time _ms5_timestamp;
+    core::os::Time _ms10_timestamp;
+    core::os::Time _ms500_timestamp;
+    core::os::Time _s10_timestamp;
+    core::os::Time _infinite_timestamp;
 
     float    _reduction_ratio;
     float    _accumulator_A;
@@ -168,18 +178,19 @@ private:
     uint32_t _curr_alert_cntr;
     float    _motor_current;
     float    _motor_supply;
-
     bool     _comm_ready;
-
     uint32_t _calibrat_cntr;
     float    _current_offset;
-
     uint32_t _disengage_cntr;
     uint32_t _disengageSteps;
-	float _disengage_frequency;
-    float _disengageOffset;
-
+    uint32_t _disengageSin;
+    float    _disengage_frequency;
+    float    _disengageOffset;
     bool     _pos_calibration;
+    float    _target_predisengage;
+    bool     _disengage_status;
+    bool     _disengage_start;
+    int      _brake_status;
 };
 }
 }

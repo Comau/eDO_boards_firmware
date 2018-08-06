@@ -18,7 +18,17 @@
 #include <string.h>
 #include <stdio.h>
 #include <comau_edo/edo_msgs/EdoJointVersion.hpp>
+#ifndef MAX_JOINTS
+// See also ROSSerialNode.hpp
+#define MAX_JOINTS  7  /* Create a limited amount of node servers on the USB board */
+#define JOINT_MASK  0x0000000000000007F /* Mask consistent with the MAX_JOINT definition */
+#endif
 //#include <core/joint/ROSSerialNode.hpp>
+#define J_ACK_TE 0
+#define J_ACK_FE 1
+#define J_ERR_TE 2
+#define J_ERR_FE 3
+#define J_STATE  4
 
 namespace core {
 namespace joint {
@@ -56,14 +66,17 @@ public:
 	const float & getVel(void);
 	const float & getCurrent(void);
 	const uint8_t & getCommandFlag(void);
+	const uint8_t & getCommandFlagPrev(void);
 	const bool & stateUpdated(void);
 	void setStateUpdated(const bool & updated);
+	void setCommandFlagPrev(const uint8_t & updated);
+	const char * compileLogInfoMsg(uint8_t msgType, uint8_t data);
 
 // Publishers and subscribers
-	core::mw::Subscriber<core::control_msgs::Encoder_State, 5> _subscriber_state;
+	core::mw::Subscriber<core::control_msgs::Encoder_State, (2 * MAX_JOINTS)> _subscriber_state;
 	core::mw::Publisher<comau_edo::edo_msgs::EdoJointCtrl> _publisher_ctrl;
 	core::mw::Publisher<core::control_msgs::PID_param> _publisher_config;
-	core::mw::Subscriber<comau_edo::edo_msgs::EdoJointVersion, 1> _subscriber_version;
+	core::mw::Subscriber<comau_edo::edo_msgs::EdoJointVersion, 2> _subscriber_version;
 
 private:
 
@@ -72,16 +85,16 @@ private:
 	float _vel;
 	float _current;
 	uint8_t _commandFlag; // ack
+	uint8_t _commandFlagPrev; // Previous image of the command flag
 	bool _state_updated;
 	
 	char _state_topic[10];
 	char _ctrl_topic[10];
 	char _config_topic[10];
 	char _version_topic[16];
-
+	char _msg[32];
 	core::joint::ROSSerialNode *_rosNode;
 // CoreNode events to override
-
 private:
 
 	bool
