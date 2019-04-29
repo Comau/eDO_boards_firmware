@@ -10,6 +10,8 @@
 #include <core/mw/Middleware.hpp>
 #include <core/common.hpp>
 
+#include <Module.hpp>
+
 #define DEVELOPMENT_RELEASE (1==0)
 #define ENABLE_VERSION_HANDLING (1==0)
 
@@ -17,6 +19,7 @@
 #define EDO_JOINT_FW_MINOR      0
 #define EDO_JOINT_FW_REVISION   1804
 #define EDO_JOINT_FW_SVN        458
+
 
 enum INIT_MODE {
 	DISCOVERY_MODE = 0,
@@ -42,6 +45,9 @@ ROSSerialNode::ROSSerialNode(
   _initialized = false;
   _joints_mask = 0;
   _number_of_joints = 0;
+  _led_prescaler = 10;
+  _state_joint_mask_checkFlag = false;
+
 
 }
 
@@ -57,8 +63,16 @@ ROSSerialNode::onConfigure()
 }
 
 bool
+ROSSerialNode::onPrepareHW()
+{
+    //nh.getHardware()->setIOChannel(Module::stream);
+    return true;
+}
+
+bool
 ROSSerialNode::onPrepareMW()
 {
+
   // Initialize ROS NodeHandle
   nh.initNode();
 
@@ -94,9 +108,13 @@ ROSSerialNode::onLoop()
 
   if (now_1 < _last_publish_timestamp)
     _last_publish_timestamp = now_1;
-// palSetPad(GPIOA, 3);
   if ((now_1 - _last_publish_timestamp) >= core::os::Time::ms(10))
   {
+    if (--_led_prescaler == 0)
+    {
+      palTogglePad(GPIOA,3); // Toggle del led giallo
+      _led_prescaler = 10;
+    }
     if ((_initialized == true) && (_number_of_joints > 0))
     {
       uint32_t sm_state_joint_mask = 0;
@@ -111,6 +129,8 @@ ROSSerialNode::onLoop()
           {
             sm_state_joint_mask |= (1 << j);
             _static_joints[j].setStateUpdated(false);
+            _state_joint_mask_checkCnt[j] = 0;
+            _state_joint_mask_checkFlag   = false;
             sd_commandFlag = _static_joints[j].getCommandFlag(); // Made a local copy of the Command Flags
             sd_commandFlagPrev = _static_joints[j].getCommandFlagPrev(); // Made a local copy of the previous Command Flags
             // Are there some bits different? 
@@ -151,11 +171,29 @@ ROSSerialNode::onLoop()
 #endif
             }
           }
-      
-          _jnt_state_pub_msg.joints[j].position    = _static_joints[j].getPos();
-          _jnt_state_pub_msg.joints[j].velocity    = _static_joints[j].getVel();
-          _jnt_state_pub_msg.joints[j].current     = _static_joints[j].getCurrent();
-          _jnt_state_pub_msg.joints[j].commandFlag = _static_joints[j].getCommandFlag();
+          else
+          {
+            _state_joint_mask_checkCnt[j] ++;
+            if ( _state_joint_mask_checkCnt[j] >= EDO_JOINT_MAX_CHECK_CNT)
+            {
+              _state_joint_mask_checkFlag = true;
+            }
+          }
+       
+          if ( _state_joint_mask_checkFlag)
+          {  
+            _jnt_state_pub_msg.joints[j].position    = 0;
+            _jnt_state_pub_msg.joints[j].velocity    = 0;
+            _jnt_state_pub_msg.joints[j].current     = 0;
+            _jnt_state_pub_msg.joints[j].commandFlag = _static_joints[j].getCommandFlag() | 0x20;
+          }
+          else
+          {
+            _jnt_state_pub_msg.joints[j].commandFlag = _static_joints[j].getCommandFlag();
+            _jnt_state_pub_msg.joints[j].position    = _static_joints[j].getPos();
+            _jnt_state_pub_msg.joints[j].velocity    = _static_joints[j].getVel();
+            _jnt_state_pub_msg.joints[j].current     = _static_joints[j].getCurrent();
+	        }
         }
         else
         {
@@ -165,16 +203,16 @@ ROSSerialNode::onLoop()
           _jnt_state_pub_msg.joints[j].commandFlag = 0;
         }
       }
-      // Pubblico comunque anche se non sono arrivati tutti
-      _jnt_state_pub_msg.joints_mask |= (uint64_t)(sm_state_joint_mask & JOINT_MASK);
-      _jnt_state_pub_msg.joints_length = _number_of_joints;
-    
+      
+       // Pubblico comunque anche se non sono arrivati tutti
+      _jnt_state_pub_msg.joints_mask   |= (uint64_t)(sm_state_joint_mask & JOINT_MASK);
+      _jnt_state_pub_msg.joints_length  = _number_of_joints;
+
       if(_jnt_state_pub != nullptr)
         _jnt_state_pub->publish(&_jnt_state_pub_msg);
     }
     _last_publish_timestamp = now_1;
   }
-//  palClearPad(GPIOA, 3);
   core::os::Thread::sleep(core::os::Time::ms(2));
 
 #if 0  

@@ -1316,7 +1316,7 @@ proxy_node(
             ack &= 0xF0;
           }
           encoder->commandFlag = ack;
-          Module::led_red.toggle();
+//          Module::led_red.toggle();
           //Public the message
           encoder_pub.publish(encoder);
         }

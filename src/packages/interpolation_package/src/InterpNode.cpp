@@ -171,6 +171,7 @@ InterpNode::onLoop()
 
 		current_ffv = interpolate(current_step,	_startpoint.feedfwvelocity, _startpoint.acceleration,
 				_setpoint[_tail_setp].feedfwvelocity, _setpoint[_tail_setp].acceleration);
+		current_ffv = current_ffv;
 #else
 		// Linear interpolation
 		_current_pos  = _startpoint.position;
@@ -202,7 +203,7 @@ InterpNode::onLoop()
 	if (_comm_ready &&
 		(_control_publisher.alloc(ang_setpnt))) {
 		ang_setpnt->value = _current_pos;
-		ang_setpnt->ffv   = current_ffv;
+		ang_setpnt->ffv   = _startpoint.acceleration;
 		ang_setpnt->fft   = current_fft;
 		_control_publisher.publish(ang_setpnt);
 	}

@@ -20,6 +20,12 @@
 
 #include<math.h>
 
+enum INIT_MODE {
+	DISCOVERY_MODE = 0,  // 0
+	SET_MODE,            // 1
+	CANCEL_MODE,         // 2
+	THRESHOLD_MODE       // 3
+};
 
 // --- MODULE -----------------------------------------------------------------
 
@@ -93,23 +99,23 @@ MasterNode::onPrepareMW()
 	if (_identity > 0 ) {
 		
 		//PID configuration
-		_controller.config_unsafe(  1.0, 	//kp
-									0,		//ti
+		_controller.config_unsafe(	7.5,		//kp
+									0.0,		//ti
 									0.0, 	//td
 									1.0, 	//ts
-									-46816.0, 	//min
-									46816.0,  	//max
-									100000.0, 	//sat
+									-4902.0,	//min
+									4902.0, 	//max
+									10000000.0, 	//sat
 									0, 			//kff
-									0.001,	//kpv
-									0.0, 	//tiv
+									0.01, 		//kpv
+									0.005, 		//tiv
 									0.0, 	//tdv
 									1.0, 	//tsv
-									-6.0, 		//minv
-									6.0,  		//maxv
+									-12.0, 	//minv
+									12.0, 	//maxv
 									100000.0, 	//satv
 									0.0, 		//kfv
-									1,		//kpt
+									0.0,		//kpt
 									0.0,	//tit
 									0.0,	//tdt
 									1.0,	//tst
@@ -157,107 +163,110 @@ MasterNode::init_callback(
 )
 {
 	MasterNode* _this = static_cast<MasterNode*>(context);
+	uint32_t    jmask = (uint32_t)msg.joints_mask; // From U Long Long to U Long
 
 	switch (msg.mode)
 	{
-		case (0):{  // Discovery ID
+		case (DISCOVERY_MODE):
+		{  // Discovery ID
 			if ((_this->_identity > 0) &&
-				(msg.joints_mask & (1uL << (_this->_identity - 1)))) {
+					(jmask & (1uL << (_this->_identity - 1))))
+			{
 
 				_this->_controller.setack(J_STATE_ACK_INIT);
 			}
-
 			break;
 		}
 
-
-	    case (1):{ // Set ID
-	    	if (_this->_identity <= 0 ) {
-
+		case (SET_MODE):
+		{  // Set ID
+			if (_this->_identity <= 0 )
+			{
 				//Search the joint ID
-	    		for(uint8_t i = 1; i <= (8 * sizeof(msg.joints_mask)); i++) {
-
-	    			if (msg.joints_mask == (1uL << (i - 1))) {
-
-	    				// Found!
-	    				_this->_identity = i;
-	    				_this->_reduction = msg.reduction;
+				for(uint8_t i = 1; jmask != 0; i++, jmask >>= 1)
+				{
+					if (jmask & 1uL)
+					{
+						// Found!
+						_this->_identity = i;
+						_this->_reduction = msg.reduction;
 
 						//Configue the PID
-	    				_this->_controller.config_unsafe(	1.0, 	//kp
-															0, 		//ti
+						_this->_controller.config_unsafe(	7.5,		//kp
+															0.0,		//ti
 															0.0, 	//td
 															1.0, 	//ts
-															-46816.0, 	//min
-															46816.0, 	//max
-															100000.0, 	//sat
+															-4902.0,	//min
+															4902.0,		//max
+															10000000.0,	//sat
 															0, 			//kff
-															0.001, 	//kpv
-															0.0, 	//tiv
+															0.01, 		//kpv
+															0.005, 		//tiv
 															0.0, 	//tdv
 															1.0, 	//tsv
-															-6.0, 		//minv
-															6.0, 		//maxv
+															-12.0,		//minv
+															12.0,		//maxv
 															100000.0, 	//satv
 															0.0, 		//kfv
-															1,		//kpt
+															0.0,		//kpt
 															0.0,	//tit
 															0.0,	//tdt
 															1.0,	//tst
 															-12.0,		//mint
 															12.0,		//maxt
 															100000000,	//satt
-															0.0);		//kft
+															3.0);		//kft
 
-	    				_this->_controller.communication_setup(_this->_identity, _this->_reduction);
-	    				_this->_interpolator.communication_setup(_this->_identity);
+						_this->_controller.communication_setup(_this->_identity, _this->_reduction);
+						_this->_interpolator.communication_setup(_this->_identity);
 
 						_this->overrideConfiguration();
 						_this->overridingConfiguration().Configured = _this->_identity;
 						_this->overridingConfiguration().Reduction  = _this->_reduction;
 
-				        module.configurations().saveTo(module.configurationStorage());
+						module.configurations().saveTo(module.configurationStorage());   // This will take a while, about 30 ms
 
-				        _this->_controller.setack(J_STATE_ACK_INIT);
-
-
-	    				break;
-	    			}
-	    			else {
-	    				// Do nothing
-	    			}
-
-	    		}
-
+						_this->_controller.setack(J_STATE_ACK_INIT);
+						break;
+					}
+				}
 			}
-
 			break;
-	    }
+		}
 
-
-		case (2):{  // Cancel ID
+		case (CANCEL_MODE):
+		{  // Cancel ID
 			if ((_this->_identity > 0) &&
-				(msg.joints_mask & (1uL << (_this->_identity - 1)))) {
-
+				(jmask & (1uL << (_this->_identity - 1))))
+			{
 				//Delete just the ID into the flash.
 				//On next startup the joint will be not configured.
 				_this->overrideConfiguration();
 				_this->overridingConfiguration().Configured = -1;
 				_this->overridingConfiguration().Reduction = 0.0f;
 
-		        module.configurations().saveTo(module.configurationStorage());
+				module.configurations().saveTo(module.configurationStorage());  // This will take a while, about 30 ms
 
+				_this->_controller.setack(J_STATE_ACK_INIT);
+			}
+			break;
+		}
+		case (THRESHOLD_MODE):
+		{  // Set Threshold
+			if ((_this->_identity > 0) &&
+				(jmask & (1uL << (_this->_identity - 1)))) 
+			{
+				
+				_this->_controller.set_coll_threshold(msg.reduction);
+				
 				_this->_controller.setack(J_STATE_ACK_INIT);
 			}
 
 			break;
 		}
+	}
 
-
-	 }
-
-	 return true;
-
+	return true;
 }
 
 
@@ -290,13 +299,21 @@ MasterNode::calibration_callback(
 {
 	 MasterNode* _this = static_cast<MasterNode*>(context);
 
-	if ((_this->_identity > 0) &&
-		(msg.joints_mask & (1uL << (_this->_identity - 1)))) {
+	if (_this->_identity > 0)
+	{	
+		if(msg.joints_mask & (1uL << (_this->_identity - 1))) 
+		{
 
 		_this->_controller.pos_calibration();
 		_this->_interpolator.pos_calibration();
 
 		_this->_controller.setack(J_STATE_ACK_CALIB);
+		}
+		
+		if(msg.joints_mask & 0x20) // Only if is the 6 axes node is calibrated
+		{
+		_this->_controller.current_calibration();
+		}
 	}
 
 	return true;

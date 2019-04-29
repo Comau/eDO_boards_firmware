@@ -52,6 +52,9 @@
 #define J_STATE_UNCALIB       7  // Bit YXXX.ZZZZ  0x80 -- 128
 #define J_STATE_ERR_MASK      0x40 // Filter one error only (OVERCURRENT)
 
+#define EDO_JOINT_MAX_CHECK_CNT   50
+#define J_STATE_MASK_UNDERVOLTAGE 0x20
+
 namespace core {
 namespace joint {
 class ROSSerialNode:
@@ -138,6 +141,10 @@ private:
 	bool _initialized;
 	uint32_t _joints_mask;
 	uint8_t _number_of_joints;  // E' in realta' l'indice dell'ultimo giunto
+	uint8_t _led_prescaler; 
+	uint8_t _state_joint_mask_checkCnt[MAX_JOINTS];
+    bool     _state_joint_mask_checkFlag;
+
 	core::os::Time _last_publish_timestamp;
 	
 	core::mw::CoreNodeManager joints_manager;
@@ -155,6 +162,9 @@ private:
 
 	bool
 	onPrepareMW();
+
+	bool
+	onPrepareHW();
 
 	bool
 	onLoop();

@@ -34,12 +34,45 @@
 #define J_STATE_ACK_VERSION   5
 #define J_STATE_ACK_MASK      0x0F
 // Nibble alto: viene invece gestito a singolo bit
-#define J_STATE_SPARE         4  // Bit XXXY.ZZZZ Not used
+#define J_STATE_COLLISION     4  // Bit XXXY.ZZZZ Not used
 #define J_STATE_UNDERVOLTAGE  5  // Bit XXYX.ZZZZ
 #define J_STATE_OVERCURRENT   6  // Bit XYXX.ZZZZ
 #define J_STATE_UNCALIB       7  // Bit YXXX.ZZZZ
 
 #define J_STATE_ACK_CYCLES    30
+#define PI                    3.14159265358979f
+#define PLANE_ANGLE           180.0f
+#define DPOSEPS               352942.00f  // [Rad_Mot]  
+#define TH_CUR                0.01f       // [A] 
+#define TH_ERRCNT             50         
+#define TH_POS                352942.00f  // [Rad_Mot]    // [Rad] = 5 [Deg_Link]
+
+
+#define CONTROL_DEFAULT_PARAMETERS \
+          7.5,        /* kp   */ \
+          0.0,        /* ti   */ \
+          0.0,        /* td   */ \
+          1.0,        /* ts   */ \
+         -4902.0,     /* min  */ \
+          4902.0,     /* max  */ \
+          10000000.0, /* sat  */ \
+          0,          /* kff  */ \
+          0.01,       /* kpv  */ \
+          0.005,      /* tiv  */ \
+          0.0,        /* tdv  */ \
+          1.0,        /* tsv  */ \
+         -12.0,       /* minv */ \
+          12.0,       /* maxv */ \
+          100000.0,   /* satv */ \
+          0.0,        /* kfv  */ \
+          0.0,        /* kpt  */ \
+          0.0,        /* tit  */ \
+          0.0,        /* tdt  */ \
+          1.0,        /* tst  */ \
+         -12.0,       /* mint */ \
+          12.0,       /* maxt */ \
+          100000000,  /* satt */ \
+          3.0         /* kft  */
 
 // --- DEFINITION -------------------------------------------------------------
 namespace core {
@@ -84,6 +117,12 @@ public:
 
     void
     pos_calibration(void);
+	
+	void
+    current_calibration(void);
+	
+	void
+	set_coll_threshold(float coll_limit);
 
     virtual
     ~ControlNode();
@@ -128,7 +167,9 @@ private:
 
     float
     filterVoltage();
-
+	
+	unsigned int 
+    safetyCheck(float _misFiltered, bool _fllerr, bool _fllerr_power);
 
 private:
 
@@ -150,9 +191,12 @@ private:
     float _calibpos;							//Angular position calibration offset
     float _calibtarget;							//Target position calibration offset
     float _ff_vel;								//Velocity feedforward
+    float _current;                             //Dynamic Model Current
     float _ff_torque;							//Torque feedforward
     float _currvel;								//Motor speed
+	int   _ErrorCheckSafe;                      // Safety variable
     int   _ackindex;							//
+	int   _identity;
     uint8_t _ack;								//Acknowledge/Errors
     uint8_t _jnt_err;							//Joint warnings/errors
 
@@ -183,14 +227,20 @@ private:
     float    _current_offset;
     uint32_t _disengage_cntr;
     uint32_t _disengageSteps;
-    uint32_t _disengageSin;
     float    _disengage_frequency;
     float    _disengageOffset;
     bool     _pos_calibration;
+    bool     _current_calibration;
+    bool     _current_calibration_completed;
     float    _target_predisengage;
+    float    _current_limit;
     bool     _disengage_status;
     bool     _disengage_start;
     int      _brake_status;
+      //---------SAFETY CHECK -------//
+    bool    _fllerr;
+    bool    _fllerr_power;
+    float   _misFiltered;
 };
 }
 }

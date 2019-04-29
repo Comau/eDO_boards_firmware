@@ -24,20 +24,22 @@
 #include <math.h>
 
 // Current offset calibration time (in steps, 1ms each one)
-#define STOP_CURR_CALIB_CNTR 20
+#define STOP_CURR_CALIB_CNTR 250
+#define DISA_CURR_CALIB_CNTR 251
 // Time spent in brake disengage (in steps, 1ms each one)
 #define DISENGAGE_STEPS 1000
 #define DISENGAGE_OFFS  (1.0f * _this->_reduction_ratio) // 1 deg
 
 #define OVERCURRENT_THS		3.0f
-#define UNDERVOLTAGE_THS	4.0f
+#define UNDERVOLTAGE_THS	5.0f
+#define DYN_MOD_CNTR_MAX    2
 
 #define EDO_JOINT_FW_MAJOR      2
 #define EDO_JOINT_FW_MINOR      0
 #define EDO_JOINT_FW_REVISION   1805
 #define EDO_JOINT_FW_SVN        459
 
-#define EDO_DISENGAGE_ADDSTEPS  3000
+#define EDO_DISENGAGE_SIN       5000
 #define EDO_DISENGAGE_NFASE     2
 #define EDO_DISENGAGE_QUARTER   0.25f
 #define EDO_DISENGAGE_OFFSETNOM 3.5f
@@ -70,9 +72,12 @@ ControlNode::ControlNode(
     _calibpos(0.0f),
     _calibtarget(0.0f),
     _ff_vel(0.0f),
+    _current(0.0f),
     _ff_torque(0.0f),
     _currvel(0.0f),
+    _ErrorCheckSafe(0),
     _ackindex(0),
+    _identity(-1),
     _last_encoder_timestamp(core::os::Time::now()),
     _last_encoder_measure(core::os::Time::now()),
     _last_supply_drop_timestamp(core::os::Time::now()),
@@ -91,19 +96,25 @@ ControlNode::ControlNode(
     _motor_current(0.0f),
     _motor_supply(0.0f),
     _comm_ready(false),
-    _calibrat_cntr(0),
+    _calibrat_cntr(DISA_CURR_CALIB_CNTR),
     _current_offset(0.0f),
     _disengage_cntr(0),
     _disengageSteps(1000),
     _disengage_frequency(0.0f),
     _disengageOffset(2.0f),
     _pos_calibration(false),
+    _current_calibration(false),
+    _current_calibration_completed(false),
     _target_predisengage(0.0f),
+    _current_limit(0.0f),
     _disengage_status(false),
     _disengage_start(false),
-	_brake_status(0)
+    _brake_status(0),
+    _fllerr(false),
+    _fllerr_power(false),
+    _misFiltered(0.0f)
 {
-    _workingAreaSize = 2048;
+    _workingAreaSize = 2560;
     setStatusMask(J_STATE_UNCALIB, true);
 }
 
@@ -127,47 +138,22 @@ ControlNode::onInitialize()
 bool
 ControlNode::onConfigure()
 {
-    bool success = true;
+  bool success = true;
 
-      overrideConfiguration();
+  overrideConfiguration();
 
-      //Recovery of the saved position (if valid)
-      if (overridingConfiguration().pos_validity == 1)
-      {
-    	  _accpos = overridingConfiguration().position;
-      }
+  //Recovery of the saved position (if valid)
+  if (overridingConfiguration().pos_validity == 1)
+  {
+    _accpos = overridingConfiguration().position;
+  }
 
-	  success &= _encoder.configure();
-	  success &= _motor.configure();
+  success &= _encoder.configure();
+  success &= _motor.configure();
 
-	  config_unsafe(	1.0,		//kp
-						10000,		//ti
-						0.0,		//td
-						1.0,		//ts
-						-46816.0,	//min
-						46816.0, 	//max
-						100000.0, 	//sat
-						0, 			//kff
+  config_unsafe(CONTROL_DEFAULT_PARAMETERS);
 
-						1, 			//kpv
-						0.0, 		//tiv
-						0.0, 		//tdv
-						1.0, 		//tsv
-						-93631.0, 	//minv
-						93631.0, 	//maxv
-						100000.0, 	//satv
-						0.0, 		//kfv
-
-						1,			//kpt
-						0.0,		//tit
-						0.0,		//tdt
-						1.0,		//tst
-						-12.0,		//mint
-						12.0,		//maxt
-						100000000,	//satt
-						0.0);		//kft
-
-    return success;
+  return success;
 }
 
 bool
@@ -181,7 +167,7 @@ ControlNode::onPrepareHW()
 bool
 ControlNode::onPrepareMW()
 {
-	//Registers the subscribers callback
+    //Registers the subscribers callback
     _subscriber_setpoint.set_callback(ControlNode::setpoint_callback);
     _subscriber_parameters.set_callback(ControlNode::parameters_callback);
     bool success = true;
@@ -224,7 +210,10 @@ ControlNode::onLoop()
 {
     //Get the current time
     core::os::Time now_1;
-
+    bool collDetflag = false;
+	float vr_dynFiltered (0.0f);
+	//float vr_misFiltered (0.0f);
+    int   vi_identity;
 
     // Spin with timeout 5ms - Normally the timeout does not expire,
     // a setpoint every 1msec comes from the interpolator.
@@ -249,16 +238,24 @@ ControlNode::onLoop()
         deltatime = now_2.raw - _last_encoder_measure.raw;
 
         //Motore speed
-        speed = (deltapos * 1000000) / deltatime;
+        if (deltatime > 0)
+          speed = (deltapos * 1000000) / deltatime;
+        else
+          speed = 0;
 
         _last_encoder_measure = now_2;
         _currvel = speed;
         _accpos += deltapos;
 
         //Apply the control
-        temp = update(_accpos , _currvel, _motor_current,_brake_status);
-        
+        temp = update(_accpos , _currvel, _motor_current,_reduction_ratio,_brake_status,&_fllerr);
         _motor.setI(temp);
+
+		//switch (_ErrorCheckSafe)
+		//{
+		//	  case 0:_motor.setI(temp);
+		//    case 1:_motor.setI(0);      /* l'asse non si muove nonostante gli e' stato richiesto di farlo */
+		//} /* switch (_ErrorCheckSafe) */
       }
       else
       {
@@ -280,11 +277,14 @@ ControlNode::onLoop()
         // Phase 2: calculates offset
         _current_offset /= _calibrat_cntr;
         _calibrat_cntr++;
+        _motor_current = - (filterCurrent() - _current_offset);
+        reset_collDetFilter();
+        _current_calibration_completed = true;
       }
       else
       {
         //Phase 3: apply MA FIR to the motor current ADC measure
-        _motor_current = filterCurrent() - _current_offset;
+        _motor_current = - (filterCurrent() - _current_offset); //GA_attention: introduced a minus sign to fit the dynamic model
       }
     }
 
@@ -301,7 +301,7 @@ ControlNode::onLoop()
       module.brake.set();
 
       // Clear undervoltage alarm bit
-      setStatusMask(J_STATE_UNDERVOLTAGE, false);
+      // setStatusMask(J_STATE_UNDERVOLTAGE, false);
     }
     else
     {
@@ -332,8 +332,8 @@ ControlNode::onLoop()
     // ---  BEGIN : PUBLICATION OF JOINT STATE EVERY 10ms ----------------------------------------------------
 
     //When 10ms are elapsed---
-	if (now_1 < _last_encoder_timestamp)
-	  _last_encoder_timestamp = now_1;
+    if (now_1 < _last_encoder_timestamp)
+       _last_encoder_timestamp = now_1;
     if ((now_1 -_last_encoder_timestamp) >= _ms10_timestamp)
     {
       //Overcurrent alarm management
@@ -342,30 +342,57 @@ ControlNode::onLoop()
         _curr_alert_cntr++;
         //Enter alarm state if the overcurrent is confirmed for 0.5sec.
         if (_curr_alert_cntr >= 50)
+        {
           setStatusMask(J_STATE_OVERCURRENT, true);
-        //Overcurrent alarm is NOT reversible.
+        }
       }
       else
       {
+        setStatusMask(J_STATE_OVERCURRENT, false);
         //Measure OK; reset the counter
         _curr_alert_cntr = 0;
       }
+	  
+	  vi_identity =_identity;
+    
+    (void)collDetect(_motor_current, _current, &collDetflag, &_misFiltered, &vr_dynFiltered, vi_identity, _current_limit);
 
-      //Prepare the state message
+    //Prepare the state message
+	  if(collDetflag && _current_calibration_completed && _fllerr_power && _brake_status == 2)
+	  {
+		palSetPad(GPIOA,11); //Red Led
+		//setStatusMask(J_STATE_COLLISION, true);
+        // Set undervoltage alarm bit
+        setStatusMask(J_STATE_UNDERVOLTAGE, true);
+         
+		// _this->reset_i();
+        //  // Hold the position loop open
+        //  _this->hold_pos(true);
+        //  // il sistema non e' sfrenato
+        //  _this->_brake_status = 0;
+
+      }
+      else
+      {
+        palClearPad(GPIOA,11); //Red Led
+        //setStatusMask(J_STATE_COLLISION, false);
+	  }
+	  
       core::control_msgs::Encoder_State* encoder;
       if (_comm_ready &&
           _encoder_publisher.alloc(encoder))
       {
         //Fill in the message fields
-        encoder->position    = (_accpos - _calibpos) / _reduction_ratio;
-        encoder->velocity    = _currvel / _reduction_ratio;  
-//       encoder->velocity    = (_target - _calibtarget) / _reduction_ratio; // GC Only for MONI
-
-        encoder->current     = _motor_current;
-        encoder->commandFlag = _ack;
+        encoder->position    = (_accpos - _calibpos) / _reduction_ratio; //posizione misurata [Deg_mot] 
+        encoder->velocity    = _currvel / _reduction_ratio;  //velocità misurata [Deg/s_mot] 
+        //encoder->velocity    = vr_dynFiltered; // MF Only for MONI to debug coll. detection
+        //encoder->velocity    = (_target - _calibtarget) / _reduction_ratio; // GC Only for MONI
+        //encoder->current     = _misFiltered;  //corrente misurata filtrata [A]
+        encoder->current     = _motor_current;  //corrente misurata filtrata [A]
+     	encoder->commandFlag = _ack;
         //Public the message
         _encoder_publisher.publish(encoder);
-
+        
         //If there is an active ACK...
         core::os::SysLock::Scope lock;
         if (_ackindex > 0)
@@ -398,7 +425,6 @@ ControlNode::onStop()
     return success;
 }
 
-
 float tmp_shock = 0.0;
 
 // --- SETPOINT CALLBACK AND CONTROL LOOP ------------------------------------
@@ -408,177 +434,209 @@ ControlNode::setpoint_callback(
     void*                                  context
 )
 {
-    ControlNode* _this = static_cast<ControlNode*>(context);
+  ControlNode* _this = static_cast<ControlNode*>(context);
 
-    //If the calibration procedure is running...
-	if (_this->_pos_calibration)
-	{
-		//...store the current position and...
-		_this->_calibpos = _this->_accpos;
-		_this->hold_pos(true);
+  //If the calibration procedure is running...
+  if (_this->_pos_calibration)
+  {
+    //...store the current position and...
+    _this->_calibpos = _this->_accpos;
+    _this->hold_pos(true);
 
-		_this->reset_trgFilter();
+    _this->reset_trgFilter();
 
-		//...check to exit the calibration procedure as soon as the received target is zero.
-		if (fabs(msg.value) < 0.01f)
-		{
-			//Set the calibration offset to the target.
-			_this->_calibtarget = _this->_calibpos;
-			_this->_pos_calibration = false;
+    //...check to exit the calibration procedure as soon as the received target is zero.
+    if (fabs(msg.value) < 0.01f)
+    {
+      //Set the calibration offset to the target.
+      _this->_calibtarget = _this->_calibpos;
+      _this->_pos_calibration = false;
 
-
-
-			_this->hold_pos(false);
-			//Calibrated!
-			_this->overridingConfiguration().pos_validity = 1;
-			//Reset the uncalibrated error, if active.
-			_this->setStatusMask(J_STATE_UNCALIB, false);
-		}
-	}
-
-    // Get the targets from the message
-      _this->_target    = msg.value * _this->_reduction_ratio;
-      _this->_ff_vel    = msg.ffv   * _this->_reduction_ratio;
-      _this->_ff_torque = msg.fft   / _this->_reduction_ratio;
-    // Apply the calibration correction
-      _this->_target += _this->_calibtarget;
-
-	// When the motor supply is off do not accumulate integration errors,
-	// to avoid a sudden reaction when the supply will be provided.
-      _this->_disengage_status = false;
-      _this->_disengage_start = false;
-	if (_this->_motor_supply <= UNDERVOLTAGE_THS)
-	{
-		// Set zero the integral terms
-		_this->reset_i();
-		// Hold the position loop open
-		_this->hold_pos(true);
-		// il sistema non e' sfrenato
-		_this->_brake_status = 0;
-	}
-	else
-	{
-		// Disengage the brake only if the motor is supplied
-		if(_this->_disengage_cntr > 0)
-		{
-		  // il sistema sta sfrenando
-			_this->_brake_status = 1;
-		  // eventuale attivazione loop di posizione
-		    if(_this->_disengage_cntr == _this->_disengageSteps)
-		    {
-		       _this->reset_trgFilter();
-		       _this->hold_pos(false);
-         	       _this->_disengage_start = true;
-      		    }
-     		    
-     		  // _disengageSin    = time + EDO_DISENGAGE_ADDSTEPS;
-     		  // _disengageSteps  = _disengageSin + EDO_DISENGAGE_DELAY + EDO_MOVE_RECOVERY_STEPS; // VP_ATTENTION : deve essere "time"
+      _this->hold_pos(false);
+      //Calibrated!
+      _this->overridingConfiguration().pos_validity = 1;
+      //Reset the uncalibrated error, if active.
+      _this->setStatusMask(J_STATE_UNCALIB, false);
+      //Following Error Detection ON
+      _this->_fllerr_power = true;
+    }
+  }
   
-     		    
-                  // calcolo dell'onda aggiuntiva
-                    if (_this->_disengage_cntr > (EDO_MOVE_RECOVERY_STEPS + EDO_DISENGAGE_DELAY))
-                    { // sinusoide crescente di sfreno (questo ramo viene eseguito per "_disengageSin" volte)
-                      uint32_t vr_cntrSin;
-                      vr_cntrSin = _this->_disengage_cntr - (EDO_MOVE_RECOVERY_STEPS + EDO_DISENGAGE_DELAY);
-		      tmp_shock = ( _this->_disengageSin - vr_cntrSin) *_this->_disengageOffset * (float)sin((double)(2.0*3.14159265 * _this->_disengage_frequency * (float)vr_cntrSin));
-		    }		    
-		    else if (_this->_disengage_cntr > EDO_MOVE_RECOVERY_STEPS)
-		    { // ritardo tra la sinusoide e la move di recupero (questo ramo viene eseguito per "EDO_DISENGAGE_DELAY" volte) 
-		      tmp_shock = 0.0;
-		    }		    
-		    else
-		    { // move di recupero (questo ramo viene eseguito per "EDO_MOVE_RECOVERY_STEPS" volte)
-		      
-		      tmp_shock = 0.0;
+  if(_this->_current_calibration)
+  {
+    //Re-calculate the currentt offset
+    _this->_calibrat_cntr = 0;
+    _this->_current_offset = 0.0f;
+    _this->_current_calibration = false;
+  }
 
-		      float vr_time;
-		      vr_time = (float)(EDO_MOVE_RECOVERY_STEPS - _this->_disengage_cntr) * EDO_MOVE_RECOVERY_TS;
-		      if (vr_time < EDO_MOVE_RECOVERY_TIME0)
-		      { // limite inferiore
-		        vr_time = EDO_MOVE_RECOVERY_TIME0;
-		      }
-		      else if (vr_time > ((float)EDO_MOVE_RECOVERY_STEPS * EDO_MOVE_RECOVERY_TS))
-		      { // limite superiore
-		        vr_time = (float)EDO_MOVE_RECOVERY_STEPS * EDO_MOVE_RECOVERY_TS;
-		      }
-		      tmp_shock = _this->recoveryMove((_this->_target - _this->_target_predisengage), vr_time);
-		    }
-		  // aggiornamento del contatore di disengage
-		    _this->_disengage_cntr --;
-		     if (_this->_disengage_cntr == 0)
-		     { // il sistema e' sfrenato
-		       _this->_brake_status = 2;
-	             }
-		  // fase attiva di disengage
-     	            _this->_disengage_status = true;
-		}		
-		else
-		{
-                  // annullamento dell'onda aggiuntiva
-  		    tmp_shock = 0.0;
-		}
-		  // _this->_target += tmp_shock;
-	}
+  // Get the targets from the message
+  _this->_target    = msg.value * _this->_reduction_ratio;
+  _this->_ff_vel    = msg.ffv   * _this->_reduction_ratio;
+  _this->_current   = msg.ffv;
+  _this->_ff_torque = msg.fft   / _this->_reduction_ratio;
+  // Apply the calibration correction
+  _this->_target += _this->_calibtarget;
+   
+  // When the motor supply is off do not accumulate integration errors,
+  // to avoid a sudden reaction when the supply will be provided.
+  _this->_disengage_status = false;
+  _this->_disengage_start = false;
+  if (_this->_motor_supply <= UNDERVOLTAGE_THS)
+  {
+    // Set zero the integral terms
+    _this->reset_i();
+    // Hold the position loop open
+    _this->hold_pos(true);
+    // il sistema non e' sfrenato
+    _this->_brake_status = 0;
+  }
+  else
+  {
+    // Disengage the brake only if the motor is supplied    
+    //_timeRecovery = EDO_MOVE_RECOVERY_STEPS + time/2000 - 1; //Attention: the previous App send 2000 as time, now the time is related to recovery_move
+      //_disengageSteps  = EDO_DISENGAGE_SIN + EDO_DISENGAGE_DELAY + EDO_MOVE_RECOVERY_STEPS;
 
+    if(_this->_disengage_cntr > 0)
+    {
+      // il sistema sta sfrenando
+      _this->_brake_status = 1;
+      // eventuale attivazione loop di posizione
+      if(_this->_disengage_cntr == _this->_disengageSteps)
+      {
+        _this->reset_trgFilter();
+        _this->reset_collDetFilter();
+        _this->hold_pos(false);
+        _this->_disengage_start = true;
+      }
+      if (_this->_disengage_cntr > (EDO_MOVE_RECOVERY_STEPS + EDO_DISENGAGE_DELAY))
+      { // calcolo dell'onda aggiuntiva
+        if(_this->_identity > 0 && _this->_identity < 4)
+        { // sinusoide crescente di sfreno (questo ramo viene eseguito per "_disengageSin" volte)
+          uint32_t vr_cntrSin;
+          vr_cntrSin = _this->_disengage_cntr - (EDO_MOVE_RECOVERY_STEPS + EDO_DISENGAGE_DELAY);
+          tmp_shock = ( EDO_DISENGAGE_SIN - vr_cntrSin) *_this->_disengageOffset * (float)sin((double)(2.0*3.14159265 * _this->_disengage_frequency * (float)vr_cntrSin));
+        }
+        else
+        {
+          tmp_shock = 0.0;
+        }
+      }
+      else if (_this->_disengage_cntr > EDO_MOVE_RECOVERY_STEPS)
+      { // ritardo tra la sinusoide e la move di recupero (questo ramo viene eseguito per "EDO_DISENGAGE_DELAY" volte) 
+        tmp_shock = 0.0;
+      }
+      else
+      { // move di recupero (questo ramo viene eseguito per "EDO_MOVE_RECOVERY_STEPS" volte)          
+        tmp_shock = 0.0;
+        float vr_time;
+        vr_time = (float)(EDO_MOVE_RECOVERY_STEPS - _this->_disengage_cntr) * EDO_MOVE_RECOVERY_TS;
+        if (vr_time < EDO_MOVE_RECOVERY_TIME0)
+        { // limite inferiore
+          vr_time = EDO_MOVE_RECOVERY_TIME0;
+        }
+        else if (vr_time > ((float)EDO_MOVE_RECOVERY_STEPS * EDO_MOVE_RECOVERY_TS))
+        { // limite superiore
+          vr_time = (float)EDO_MOVE_RECOVERY_STEPS * EDO_MOVE_RECOVERY_TS;
+        }
+        tmp_shock = _this->recoveryMove((_this->_target - _this->_target_predisengage), vr_time);
+      }
+      // aggiornamento del contatore di disengage
+      _this->_disengage_cntr --;
+      if (_this->_disengage_cntr == 0)
+      { // il sistema e' sfrenato
+        _this->_brake_status = 2;
+      }
+      // fase attiva di disengage
+      _this->_disengage_status = true;
+    }    
+    else
+    {
+      // annullamento dell'onda aggiuntiva
+      tmp_shock = 0.0;
+    }
+    // _this->_target += tmp_shock;
+		  _this->setStatusMask(J_STATE_UNDERVOLTAGE, false);
+		  _this->_ErrorCheckSafe = 0;
+		  _this->_fllerr = false;
+  }
 
-    if (_this->_encoder.update()) 
-	{
-		float deltapos;
-		float speed;
-		float temp;
-		int deltatime;
+    float deltapos;
+    float speed;
+    float temp;
+    int deltatime;
 
-		_this->_encoder.get(deltapos);
+    _this->_encoder.get(deltapos);
 
-		core::os::Time now_time = core::os::Time::now();
+    core::os::Time now_time = core::os::Time::now();
+    // deltatime is in milliseconds
+    deltatime = now_time.raw - _this->_last_encoder_measure.raw;
+    if (deltatime > 0)
+	  speed = (deltapos * 1000000.0f) / deltatime;
+    else
+      speed = 0;
+    _this->_last_encoder_measure = now_time;
+    _this->_currvel = speed;
+    _this->_accpos += deltapos;
+    // salvataggio della posizione attuale
+    if (_this->_disengage_start)
+    {
+      _this->_target_predisengage = _this->_accpos;
+    }
+    // Set the target and the feedforwards
+    if (_this->_disengage_status)
+    {
+      _this->set(_this->_target_predisengage+tmp_shock, 0.0f, 0.0f);
+      _this->_target = _this->_target_predisengage;
+    }
+    else
+    {
+      _this->set(_this->_target, _this->_ff_vel, _this->_ff_torque);
+    }
 
-		deltatime = now_time.raw - _this->_last_encoder_measure.raw;
+    // Apply the control
+		  temp = _this->update(_this->_accpos, _this->_currvel, _this->_motor_current, _this->_reduction_ratio, _this->_brake_status,  &_this->_fllerr);
+		  
+	// Controllo degli errori
+	  if (_this->_current_calibration_completed && _this->_brake_status == 2)
+	  {
 
-		speed = (deltapos * 1000000.0f) / deltatime;
+	    _this->_ErrorCheckSafe = _this->safetyCheck(_this->_misFiltered, _this->_fllerr, _this->_fllerr_power);
+	    
+		//if (fabs(_this->vr_FllErr) > TH_FE)
+		if (_this->_ErrorCheckSafe > 0)
+	    { 	 
+        // ENTRO NELLO STATO DI BRAKE
+          // Set undervoltage alarm bit
+          _this->setStatusMask(J_STATE_UNDERVOLTAGE, true);
+		          
+	      //_this->reset_i();
+          //// Hold the position loop open
+          //_this->hold_pos(true);
+          //// il sistema non e' sfrenato
+          //_this->_brake_status = 0;
 
-		_this->_last_encoder_measure = now_time;
-		_this->_currvel = speed;
-		_this->_accpos += deltapos;
-
-		// salvataggio della posizione attuale
-		  if (_this->_disengage_start)
-		  {
-		    _this->_target_predisengage = _this->_accpos;
-		  }
-	    // Set the target and the feedforwards
-		  if (_this->_disengage_status)
-		  {
-  	        _this->set(_this->_target_predisengage+tmp_shock, 0.0f, 0.0f);
-  	        _this->_target = _this->_target_predisengage;
-		  }
-		  else
-		  {
-  	        _this->set(_this->_target, _this->_ff_vel, _this->_ff_torque);
-		  }
-
-	    // Apply the control
-		  temp=_this->update(_this->_accpos, _this->_currvel, _this->_motor_current, _this->_brake_status);
-
-	    if (_this->_calibrat_cntr > STOP_CURR_CALIB_CNTR)
-		{
-	    	_this->_motor.setI(temp);
+		  palSetPad(GPIOA,11); //Red Led	    	
 	    }
 	    else
-		{
-	    	// Do not control during current offset calibration
-            _this->_motor.setI(0);
+	    {
+	  	  palClearPad(GPIOA,11); //Red Led
 	    }
-    }
-    else 
-	{
-
-    	// Set the target and the feedforwards
-          _this->set(_this->_target, _this->_ff_vel, _this->_ff_torque);
-
-        //The encoder does not work, just hold the motor brake on
-		  _this->_motor.setI(0);
-	}
-
+	  }
+      // DEFAULT MANAGEMENT
+	  if (_this->_calibrat_cntr > STOP_CURR_CALIB_CNTR)
+	  {
+	    _this->_motor.setI(temp);
+	  }
+      else 
+      {
+      // Do not control during current offset calibration
+      // Set the target and the feedforwards
+        _this->set(_this->_target, _this->_ff_vel, _this->_ff_torque);
+       //The encoder does not work, just hold the motor brake on
+       _this->_motor.setI(0);
+      }
+	  
     return true;
 }
 
@@ -648,6 +706,11 @@ void ControlNode::setStatusMask(const uint8_t bit, const bool set)
     _ack &= ~(1 << bit);
 }
 
+void
+ControlNode::set_coll_threshold(float coll_limit)
+{
+  _current_limit = coll_limit;
+}
 //
 float ControlNode::recoveryMove(float vr_DeltaPos, float vr_T)
 
@@ -657,6 +720,7 @@ Movimento di recupero dopo la sfrenatura
    
 Input:
 - vr_DeltaPos        : spostamento angolare con segno [deg motore]
+- vr_T               : istante di tempo corrente [sec]
 
 Output:
 - vr_CurrentDeltaPos : spostamento campionato di recupero con segno [deg motore]
@@ -664,7 +728,6 @@ Output:
 */
 
  {
-
 
 /* variabili locali */
   float vr_Taccmax;             /* tempo di accelerazione da caratterizzazione per la move di recupero [sec]            */   
@@ -679,14 +742,13 @@ Output:
   float vr_T1,vr_T2,vr_T3;      /* istanti di tempo delle fasi della move di recupero [sec]                             */
   float vr_DP0, vr_V0, vr_A;    /* valori di posizione, velocita' e accelerazione utilizzati da interpolatore           */ 
   float vr_DT;                  /* variabile temporale della fase di interpolazione                                     */
-  float vr_CurrentDeltaPosAbs;  /* spostamento corrente in valore asoluto [deg motore]                                  */
-  float vr_CurrentDeltaPos;     /* spostamento corrente [deg motore] */  
-
+  float vr_CurrentDeltaPosAbs;  /* spostamento corrente in valore assoluto [deg motore]                                  */
+  float vr_CurrentDeltaPos;     /* spostamento corrente [deg motore]                                                    */  
 
 /* caratterizzazione */
   vr_Taccmax = 0.500;   /* tempo di accelerazione [sec]            */
   vr_Tdecmax = 0.500;   /* tempo di decelerazione [sec]            */
-  vr_Vmax    = 15000.0; /* velocita' massima      [deg/sec motore] */
+  vr_Vmax    = 28000.0;  /* velocita' massima      [deg/sec motore] */
 
 /* spostamento in valore assoluto */
   vr_DeltaPosAbs = fabs(vr_DeltaPos);
@@ -734,7 +796,7 @@ Output:
       vr_V0  = 0.0;
       vr_A   = vr_Acc;
       vr_DT  = vr_T;
-      vr_CurrentDeltaPosAbs = vr_DP0 + vr_V0 * vr_T + 0.5 * vr_A * vr_DT*vr_DT;
+      vr_CurrentDeltaPosAbs = vr_DP0 + vr_V0 * vr_DT + 0.5 * vr_A * vr_DT*vr_DT;
     }
     else if (vr_T < vr_T2)
     { /* fase di cruise */
@@ -742,8 +804,6 @@ Output:
       vr_V0  = vr_Acc * vr_T1;
       vr_A   = 0.0;
       vr_DT  = vr_T - vr_T1;
-      vr_CurrentDeltaPosAbs = vr_DP0 + vr_V0 *(vr_T-vr_T1);
-
       vr_CurrentDeltaPosAbs = vr_DP0 + vr_V0 * vr_DT + 0.5 * vr_A * vr_DT*vr_DT;
       /* in cruise, l'accelerazione e' nulla */
 
@@ -779,23 +839,18 @@ Output:
 //
 
 
-
-
-
-
 // --- START THE BRAKE DISENGAGMENT - CALLED BY THE MASTERNODE ------------
 void
 ControlNode::disengage_brake(const uint32_t & time, const float & offset)
 {
-
+	
     float vr_Freq, vr_Amp;
 
+    
+	//_timeRecovery = EDO_MOVE_RECOVERY_STEPS + time; //Attention: this could be an improvement in order to have another parameters to manage
+	_disengageSteps  = EDO_DISENGAGE_SIN + EDO_DISENGAGE_DELAY + EDO_MOVE_RECOVERY_STEPS;
 
-
-	_disengageSin    = time + EDO_DISENGAGE_ADDSTEPS;                                 // VP attention: deve essere time
-	_disengageSteps  = _disengageSin + EDO_DISENGAGE_DELAY + EDO_MOVE_RECOVERY_STEPS;
-
-    vr_Freq = 1.0 / (_disengageSin / EDO_DISENGAGE_NFASE ); // frequenza [Hz al colpo]
+    vr_Freq = 1.0 / (EDO_DISENGAGE_SIN / EDO_DISENGAGE_NFASE ); // frequenza [Hz al colpo]
     vr_Amp = offset / (((float)EDO_DISENGAGE_NFASE - EDO_DISENGAGE_QUARTER) / vr_Freq);
     vr_Amp = EDO_DISENGAGE_OFFSETNEW * offset / EDO_DISENGAGE_OFFSETNOM / (((float)EDO_DISENGAGE_NFASE - EDO_DISENGAGE_QUARTER) / vr_Freq); // VP_ATTENTION : deve essere "offset"
 
@@ -811,6 +866,13 @@ void
 ControlNode::pos_calibration(void)
 {
 	_pos_calibration = true;
+	_fllerr_power    = false;
+}
+
+void
+ControlNode::current_calibration(void)
+{
+	_current_calibration = true;
 }
 
 // --- SET THE COMMUNICATION TOPICS - CALLED BY THE MASTERNODE ------------
@@ -835,78 +897,87 @@ ControlNode::communication_setup(
    this->_reduction_ratio = red_ratio;
 
    _comm_ready = true;
-
+   _identity=ID;
+   
    return true;
-
 }
 
 bool ControlNode::version_publish(const int &id)
 {
-	comau_edo::edo_msgs::EdoJointVersion* fw_version;
-	if (_version_publisher.alloc(fw_version))
-	{
-		//Fill in the message fields
-		fw_version->id       = id;
-		fw_version->major    = EDO_JOINT_FW_MAJOR;
-		fw_version->minor    = EDO_JOINT_FW_MINOR;
-		fw_version->revision = EDO_JOINT_FW_REVISION;
-		fw_version->svn      = EDO_JOINT_FW_SVN;
-			//Public the message
-		return _version_publisher.publish(fw_version);
-	}
-
-	return false;
+  comau_edo::edo_msgs::EdoJointVersion* fw_version;
+  if (_version_publisher.alloc(fw_version))
+  {
+    //Fill in the message fields
+    fw_version->id       = id;
+    fw_version->major    = EDO_JOINT_FW_MAJOR;
+    fw_version->minor    = EDO_JOINT_FW_MINOR;
+    fw_version->revision = EDO_JOINT_FW_REVISION;
+    fw_version->svn      = EDO_JOINT_FW_SVN;
+    //Public the message
+    return _version_publisher.publish(fw_version);
+  }
+  
+  return false;
 }
 
 float
 ControlNode::filterCurrent()
-    {
-        float measure;
+{
+  float measure;
 
-        core::os::SysLock::Scope lock;
+  core::os::SysLock::Scope lock;
 
-        // Moving average FIR.
-        if (_counter_A > 0) {
-        	measure = _accumulator_A / (float)_counter_A;
-        }
-        else {
-			measure = 0.0f;
-        }
-        _counter_A = 0;
-        _accumulator_A = 0.0f;
+  // Moving average FIR.
+  if (_counter_A > 0) {
+    measure = _accumulator_A / (float)_counter_A;
+  }
+  else {
+    measure = 0.0f;
+  }
+  _counter_A = 0;
+  _accumulator_A = 0.0f;
 
-        measure = measure * (3.3f/4095.0f); // sample to Volts
-        measure = measure - (3.3f/2.0f); // Center to +- 1.65V
-        measure = measure / 0.11f; // Convert to current
+  measure = measure * (3.3f/4095.0f); // sample to Volts
+  measure = measure - (3.3f/2.0f); // Center to +- 1.65V
+  measure = measure / 0.11f; // Convert to current
 
-        // Returns the filtered current
-        return measure;
+  // Returns the filtered current
+  return measure;
 }
 
 float
 ControlNode::filterVoltage()
-    {
-        float measure;
+{
+  float measure;
 
-        core::os::SysLock::Scope lock;
+  core::os::SysLock::Scope lock;
 
-        // Moving average FIR.
-        if (_counter_V > 0) {
-        	measure = _accumulator_V / (float)_counter_V;
-        }
-        else {
-			measure = 0.0f;
-        }
-        _counter_V = 0;
-        _accumulator_V = 0.0f;
+  // Moving average FIR.
+  if (_counter_V > 0) {
+    measure = _accumulator_V / (float)_counter_V;
+  }
+  else {
+    measure = 0.0f;
+  }
+  _counter_V = 0;
+  _accumulator_V = 0.0f;
 
-        measure = measure * (48.0f/4095.0f); // sample to Volts
+  measure = measure * (48.0f/4095.0f); // sample to Volts
 
-        // Returns the filtered voltage
-        return measure;
+  // Returns the filtered voltage
+  return measure;
 }
 
-
+unsigned int 
+ControlNode::safetyCheck(float vr_CurFiltered, bool _fllerr, bool _fllerr_power)
+{
+ /* -------------------------------- SAFETY CHECK --------------------------- */
+	  if (_fllerr & _fllerr_power)
+	  {
+	     _ErrorCheckSafe = 1;
+	  }
+	return _ErrorCheckSafe;
+}
 
 }
 }

@@ -7,6 +7,7 @@
 #pragma once
 
 #include <float.h>
+#include <math.h>
 
 #define PI_GRECO        3.14159265358979f
 #define ANGOLO_PIATTO   180.0f
@@ -15,6 +16,18 @@
 #define ZERO_FLOAT      0.0f
 #define QUASIZERO_FLOAT 0.00000001f
 #define COUNTER_MAX     5000
+#define KF_THRS_IST1    0.7f
+#define KF_THRS_IST2    1.3f
+#define KF_THRS_IST3    1.0f
+#define KF_THRS_IST4    0.7f
+#define KF_THRS_IST5    0.7f
+#define KF_THRS_IST6    0.7f
+#define MAX_THRS        1000.0f
+
+#define TH_FE               186.0f   // (SP_ATTENTION: Changing the max velocity will change these parameters)
+#define TH_VELOCITY_ARM     590.00f  // Max_Velocity + 20% //[Rad/s Motor]
+#define TH_VELOCITY_WRIST   700.00f  // Max_Velocity + 20% //[Rad/s Motor]
+#define TX_RATE_SELECTION   1231.0f
 
 class PID2
 {
@@ -63,6 +76,14 @@ private:
     float _saturatort;
     //----------TORQUE CONSTANT --------//
     float _ktorque;
+    //------- COLLISION DETECTION ------//
+    int   _curfilt_cnt      ;
+    float _FiltCurDyn_Regr2 ;
+    float _FiltCurDyn_Regr1 ;
+    float _FiltCurMis_Regr2 ;
+    float _FiltCurMis_Regr1 ;   // DA INIZIALIZZARE
+    
+    
 
 public:
 
@@ -79,23 +100,31 @@ public:
 
     inline void set(float setpoint, float feedforward, float feedforwardt);
 
-    inline float update(float measure, float velocity, float current, int brk_sts);
+    inline float update(float measure, float velocity, float current, float reduction_ratio, int brk_sts, bool *ErrFlag);
 
     enum select_i { ALL_I, POS_I_ONLY };
 
     inline void reset_i(select_i sel_i = ALL_I);
 
     inline void reset_trgFilter();
+    
+    inline void reset_collDetFilter();
 
     inline void hold_pos(bool enable);
 
     inline void enable_pos(bool enable, uint32_t enable_time);
+    
+    inline float collDetect(float vr_CurMis, float vr_CurDyn, bool *flag, float *vr_CurMisFilt, float *vr_CurDynFilt, int vr_identity, float vr_curr_limit);
 
 };
 
 
 PID2::PID2(void)
-{
+{ _curfilt_cnt        = 0;
+  _FiltCurDyn_Regr2   = 0.0f;
+  _FiltCurDyn_Regr1   = 0.0f;
+  _FiltCurMis_Regr2   = 0.0f;
+  _FiltCurMis_Regr1   = 0.0f;
   _trgfilt_cnt        = 0;
   _trgfilt_Regr1      = 0;
   _trgfilt_Regr2      = 0;
@@ -131,7 +160,7 @@ PID2::PID2(void)
   _maxt               = -FLT_MAX;
   _k_fft              = 0;
   _saturatort         = 0;
-  _ktorque            = 0.00853;
+  _ktorque            = 0;
 }
 
 
@@ -195,8 +224,8 @@ void PID2::config_unsafe(float k, float ti, float td, float ts, float min, float
     _k   = 7.5;              // k;
     _ki  = 0.0;              // ti;
     _kd  = 0.0;              // td;
-    _min = -46816;           // min;
-    _max = 46816;            // max;
+    _min = -4902;           // min;  %    _min = -46816;           // min;
+    _max = 4902;            // max;  %    _max = 46816;            // max;
     _i   = 0;
     _d   = 0;
     _k_ff = 0.0;             // kff;
@@ -206,8 +235,8 @@ void PID2::config_unsafe(float k, float ti, float td, float ts, float min, float
     _kv   = 0.01;            // k2;
     _kiv  = 0.005;           // ti2;
     _kdv  = 0.0;             // td2;
-    _minv = -93631;          // min2;
-    _maxv = 93631;           // max2;
+    _minv = -12;          // min2;  %    _minv = -93631;          // min2
+    _maxv = 12;           // max2;  %    _maxv = 93631;           // max2;
     _iv   = 0;
     _dv   = 0;
     _k_ffv = 0.0;            // kff2;
@@ -263,6 +292,14 @@ void PID2::reset_trgFilter()
 
 }
 
+// Reset collision detection filter memory
+void PID2::reset_collDetFilter()
+{
+
+  _curfilt_cnt = 0;
+
+}
+
 // Open/close the position loop (hold current position/restore position control)
 void PID2::hold_pos(bool enable)
 {
@@ -302,7 +339,7 @@ void PID2::enable_pos(bool enable, uint32_t enable_time)
 }
 
 // Computation
-float PID2::update(float meas_angle,float meas_vel,float meas_curr,int brk_sts)
+float PID2::update(float meas_angle,float meas_vel,float meas_curr,float reduction_ratio,int brk_sts,bool *ErrFlag)
 {
 
     /* -------------------------------- DECLARATION --------------------------- */
@@ -340,6 +377,10 @@ float PID2::update(float meas_angle,float meas_vel,float meas_curr,int brk_sts)
     float vr_CurMis;
 
     float vr_CntrOutput;
+	float vr_FollowingError;
+	float vr_velocityCheck;
+	float vr_ThresholdVelocity;
+	bool  vb_Err;
 
     /* -------------------------------- SETTINGS --------------------------- */
 
@@ -573,13 +614,255 @@ float PID2::update(float meas_angle,float meas_vel,float meas_curr,int brk_sts)
           vr_CurOutput = _mint;
           _it = _it - vr_CurError; /* anti windup: cancel error integration */
         }
-
+		
+      /* --------------------- SAFETYCHECK VELOCITY & FOLLOWING ERROR ----------------- */ 
+	      vr_velocityCheck = (vr_PosRef-vr_PosRef_1)/vr_TsLoop;  //[Rad/s motore]
+		  vr_FollowingError = vr_PosRef - vr_PosMis; //[Rad_mot]
+		  
+		  
+		  if(fabs(reduction_ratio)>= TX_RATE_SELECTION)
+		  {
+		    vr_ThresholdVelocity = TH_VELOCITY_ARM;
+		  }
+		  else
+		  {
+		    vr_ThresholdVelocity = TH_VELOCITY_WRIST;
+		  }
+		  
+		  if(fabs(vr_velocityCheck) > vr_ThresholdVelocity  || fabs(vr_FollowingError) > TH_FE)
+		  {
+		    vb_Err = true;
+		  }
+	      else
+		  {
+		    vb_Err = false;
+		  }
+		  
       /* -------------------------------- OUTPUT --------------------------- */
 
         /* Normalize between -1.0 and 1.0 */
           vr_CntrOutput = vr_CurOutput / _maxt;
 
         /* output */
+		  *ErrFlag  = vb_Err;
           return vr_CntrOutput;
 
 } // PID::update
+
+float PID2::collDetect(float vr_CurMis, float vr_CurDyn, bool *flag, float *vr_CurMisFilt, float *vr_CurDynFilt, int vr_identity, float vr_curr_limit)
+{
+
+    /* -------------------------------- DECLARATION --------------------------- */
+    
+    float vr_TsMis;
+    float vr_FiltCurDyn_Freq;
+    float vr_FiltCurMis_Freq;
+    float vr_FiltCurDyn_a1;
+    float vr_FiltCurDyn_a2;
+    float vr_FiltCurDyn_ExpCoef ;
+    float vr_FiltCurDyn_ExpValue;
+    float vr_FiltCurMis_a1;
+    float vr_FiltCurMis_a2;
+    float vr_FiltCurMis_ExpCoef ;
+    float vr_FiltCurMis_ExpValue;   
+    float vr_FiltCurDyn_1;
+    float vr_FiltCurDyn_2;
+    float vr_CurFiltDyn  ;
+    float vr_FiltCurMis_1;
+    float vr_FiltCurMis_2;
+    float vr_CurFiltMis  ;
+    float vr_CurRes;   
+    float vr_IstError;
+    bool  vb_ContFlag;
+    bool  vb_IstFlag;
+    bool  vb_CollisionFlag;
+	float vr_Kf_Thrs_Ist;
+    
+    
+    /* -------------------------------- SETTINGS --------------------------- */
+      /* Sample Time */
+        vr_TsMis = 0.010f;
+
+      /* Cur Dyn Freq */
+        vr_FiltCurDyn_Freq = 0.78f; // definito in questa funzione
+        
+      /* Cur Mis Freq */
+        vr_FiltCurMis_Freq = 2.0f; // definito in questa funzione
+        
+	  if(vr_curr_limit == 0)
+	  {
+		if(_ktorque > 0){
+			vr_Kf_Thrs_Ist = _ktorque;
+		}
+		else if(_ktorque == 0){
+			vr_Kf_Thrs_Ist = MAX_THRS;
+		}
+		else{
+			*flag=false;
+			return 0.0f;
+		}
+	  }
+	  else if(vr_curr_limit < 0){
+		vr_Kf_Thrs_Ist = MAX_THRS;  
+	  }
+		  
+	  else{
+		vr_Kf_Thrs_Ist = vr_curr_limit;
+	  }
+	  
+#if 0  
+	  else{
+	  /* CUSTOMIZZAZIONE SOGLIE    */
+		if (vr_identity!=-1)
+		{
+			switch (vr_identity){
+				
+				case (1):
+				vr_Kf_Thrs_Ist = KF_THRS_IST1;
+				break;
+				case (2):
+				vr_Kf_Thrs_Ist = KF_THRS_IST2;
+				break;
+				case (3):
+				vr_Kf_Thrs_Ist = KF_THRS_IST3;
+				break;
+				case (4):
+				vr_Kf_Thrs_Ist = KF_THRS_IST4;
+				break;
+				case (5):
+				vr_Kf_Thrs_Ist = KF_THRS_IST5;
+				break;
+				case (6):
+				vr_Kf_Thrs_Ist = KF_THRS_IST6;
+				break;
+			}
+		}
+		else
+		{
+			*flag=false;
+			return 0.0f;
+		}
+	  }
+#endif
+      /* IMPLEMETAZIONE DEI FILTRI    */
+        /* Implementazione filtro su corrente modello dinamico       */   
+        if (vr_FiltCurDyn_Freq <= QUASIZERO_FLOAT)
+        {
+          vr_FiltCurDyn_a1 = ZERO_FLOAT;
+          vr_FiltCurDyn_a2 = ZERO_FLOAT;
+
+        }
+        else
+        {
+          vr_FiltCurDyn_ExpCoef  =     - TWO_FLOAT * PI_GRECO * vr_FiltCurDyn_Freq * vr_TsMis;
+          vr_FiltCurDyn_ExpValue =                          vr_FiltCurDyn_ExpCoef/4.0 + 1.0;
+          vr_FiltCurDyn_ExpValue = vr_FiltCurDyn_ExpValue * vr_FiltCurDyn_ExpCoef/3.0 + 1.0;
+          vr_FiltCurDyn_ExpValue = vr_FiltCurDyn_ExpValue * vr_FiltCurDyn_ExpCoef/2.0 + 1.0;
+          vr_FiltCurDyn_ExpValue = vr_FiltCurDyn_ExpValue * vr_FiltCurDyn_ExpCoef/1.0 + 1.0;
+          vr_FiltCurDyn_a1       =                        - TWO_FLOAT * vr_FiltCurDyn_ExpValue;
+          vr_FiltCurDyn_a2       =          vr_FiltCurDyn_ExpValue * vr_FiltCurDyn_ExpValue; 
+        }
+      
+       /* Implementazione filtro su corrente misurata*/
+       
+        if (vr_FiltCurMis_Freq <= QUASIZERO_FLOAT)
+        {
+          vr_FiltCurMis_a1 = ZERO_FLOAT;
+          vr_FiltCurMis_a2 = ZERO_FLOAT;
+
+        }
+        else
+        {          
+          vr_FiltCurMis_ExpCoef  =     - TWO_FLOAT * PI_GRECO * vr_FiltCurMis_Freq * vr_TsMis;
+          vr_FiltCurMis_ExpValue =                          vr_FiltCurMis_ExpCoef/4.0 + 1.0;
+          vr_FiltCurMis_ExpValue = vr_FiltCurMis_ExpValue * vr_FiltCurMis_ExpCoef/3.0 + 1.0;
+          vr_FiltCurMis_ExpValue = vr_FiltCurMis_ExpValue * vr_FiltCurMis_ExpCoef/2.0 + 1.0;
+          vr_FiltCurMis_ExpValue = vr_FiltCurMis_ExpValue * vr_FiltCurMis_ExpCoef/1.0 + 1.0;
+          vr_FiltCurMis_a1       =                        - TWO_FLOAT * vr_FiltCurMis_ExpValue;
+          vr_FiltCurMis_a2       =          vr_FiltCurMis_ExpValue * vr_FiltCurMis_ExpValue;          
+        }
+
+        _curfilt_cnt ++;
+        if (_curfilt_cnt == 1)
+        {
+         /* 1st time: */ 
+          _FiltCurDyn_Regr2  = vr_CurDyn;
+          _FiltCurDyn_Regr1  = vr_CurDyn;
+          vr_FiltCurDyn_1    = vr_CurDyn;
+          vr_FiltCurDyn_2    = vr_CurDyn;
+          vr_CurFiltDyn      = vr_CurDyn; 
+
+          _FiltCurMis_Regr2  = vr_CurMis;
+          _FiltCurMis_Regr1  = vr_CurMis;
+          vr_FiltCurMis_1    = vr_CurMis;
+          vr_FiltCurMis_2    = vr_CurMis;
+          vr_CurFiltMis      = vr_CurMis;   
+
+            // palSetPad(GPIOA,11);
+            // palSetPad(GPIOA,12);
+        }
+        else
+        {
+          /* next */
+           
+         vr_FiltCurDyn_1   = _FiltCurDyn_Regr1;
+         vr_FiltCurDyn_2   = _FiltCurDyn_Regr2;
+         vr_CurFiltDyn     = (ONE_FLOAT + vr_FiltCurDyn_a1 + vr_FiltCurDyn_a2) * vr_CurDyn - vr_FiltCurDyn_a1 * vr_FiltCurDyn_1 - vr_FiltCurDyn_a2 * vr_FiltCurDyn_2;
+         _FiltCurDyn_Regr2 = _FiltCurDyn_Regr1;
+         _FiltCurDyn_Regr1 = vr_CurFiltDyn; 
+
+
+         vr_FiltCurMis_1   = _FiltCurMis_Regr1;
+         vr_FiltCurMis_2   = _FiltCurMis_Regr2;
+         vr_CurFiltMis     = (ONE_FLOAT + vr_FiltCurMis_a1 + vr_FiltCurMis_a2) * vr_CurMis - vr_FiltCurMis_a1 * vr_FiltCurMis_1 - vr_FiltCurMis_a2 * vr_FiltCurMis_2;
+         _FiltCurMis_Regr2 = _FiltCurMis_Regr1;
+         _FiltCurMis_Regr1 = vr_CurFiltMis;          
+            
+            
+            
+    //    if (_curfilt_cnt > COUNTER_MAX)    GA_ATTENTION: va inserito???
+    //    {
+    //      _curfilt_cnt = COUNTER_MAX;
+    //      // palClearPad(GPIOA,11);
+    //      // palClearPad(GPIOA,12);
+    //    }
+        }
+        
+     // CALCOLO RESIDUI   
+        vr_CurRes     = vr_CurFiltDyn - vr_CurFiltMis; 
+        vr_IstError   = fabs(vr_CurRes);     
+
+   
+     // APPLICAZIONE DELLE SOGLIE
+    
+     // soglia su valore istantaneo 
+        if (vr_IstError > vr_Kf_Thrs_Ist)  
+        {
+          vb_IstFlag = true; 
+        }
+        else
+        {
+          vb_IstFlag = false;           
+        } // if (vr_IstError > vr_Kf_Thrs_Ist)
+     // soglia sul valore continuo
+        vb_ContFlag = false;
+         
+     // OR sulle soglie
+        if (vb_ContFlag || vb_IstFlag)
+        {  
+          vb_CollisionFlag = true;
+        }
+        else
+        {
+          vb_CollisionFlag = false;  
+        } // if wb_ContFlag | wb_IstFlag    
+  
+  *flag = vb_CollisionFlag;
+  
+  *vr_CurMisFilt = vr_CurFiltMis;
+  
+  *vr_CurDynFilt = vr_CurFiltDyn;
+  
+  return vr_IstError;        
+
+} // PID2::collDetect
