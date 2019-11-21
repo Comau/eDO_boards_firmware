@@ -22,13 +22,16 @@ namespace edo_core_msgs
       _ff_velocity_type ff_velocity;
       typedef float _ff_current_type;
       _ff_current_type ff_current;
+      typedef float _R_rasp_type;
+      _R_rasp_type R_rasp;
 
     JointControl():
       position(0),
       velocity(0),
       current(0),
       ff_velocity(0),
-      ff_current(0)
+      ff_current(0),
+      R_rasp(0)
     {
     }
 
@@ -85,6 +88,16 @@ namespace edo_core_msgs
       *(outbuffer + offset + 2) = (u_ff_current.base >> (8 * 2)) & 0xFF;
       *(outbuffer + offset + 3) = (u_ff_current.base >> (8 * 3)) & 0xFF;
       offset += sizeof(this->ff_current);
+      union {
+        float real;
+        uint32_t base;
+      } u_R_rasp;
+      u_R_rasp.real = this->R_rasp;
+      *(outbuffer + offset + 0) = (u_R_rasp.base >> (8 * 0)) & 0xFF;
+      *(outbuffer + offset + 1) = (u_R_rasp.base >> (8 * 1)) & 0xFF;
+      *(outbuffer + offset + 2) = (u_R_rasp.base >> (8 * 2)) & 0xFF;
+      *(outbuffer + offset + 3) = (u_R_rasp.base >> (8 * 3)) & 0xFF;
+      offset += sizeof(this->R_rasp);
       return offset;
     }
 
@@ -146,11 +159,22 @@ namespace edo_core_msgs
       u_ff_current.base |= ((uint32_t) (*(inbuffer + offset + 3))) << (8 * 3);
       this->ff_current = u_ff_current.real;
       offset += sizeof(this->ff_current);
+      union {
+        float real;
+        uint32_t base;
+      } u_R_rasp;
+      u_R_rasp.base = 0;
+      u_R_rasp.base |= ((uint32_t) (*(inbuffer + offset + 0))) << (8 * 0);
+      u_R_rasp.base |= ((uint32_t) (*(inbuffer + offset + 1))) << (8 * 1);
+      u_R_rasp.base |= ((uint32_t) (*(inbuffer + offset + 2))) << (8 * 2);
+      u_R_rasp.base |= ((uint32_t) (*(inbuffer + offset + 3))) << (8 * 3);
+      this->R_rasp = u_R_rasp.real;
+      offset += sizeof(this->R_rasp);
      return offset;
     }
 
     const char * getType(){ return "edo_core_msgs/JointControl"; };
-    const char * getMD5(){ return "dd52ecfce82eaa75bcc3b648c2b38483"; };
+    const char * getMD5(){ return "d7ea2ff52846d3da7658c7349ad8692b"; };
 
   };
 

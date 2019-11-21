@@ -30,7 +30,6 @@
 #include <comau_edo/edo_msgs/EdoJointVersion.hpp>
 
 
-
 // --- DEFINITION ------------------------------------------------------------------------------
 namespace core {
 namespace master_package {
@@ -40,11 +39,10 @@ class MasterNode:
 {
 public:
     MasterNode(
-        const char*                        name,
-	    core::control_pid::ControlNode&    controller,
-	    core::interpolation_package::InterpNode& interpolator,
-        os::Thread::Priority               priority = os::Thread::PriorityEnum::NORMAL
-
+        const char*                        			name,
+	    core::control_pid::ControlNode&    			controller,
+	    core::interpolation_package::InterpNode& 	interpolator,
+        os::Thread::Priority               			priority = os::Thread::PriorityEnum::NORMAL
     );
     virtual
     ~MasterNode();

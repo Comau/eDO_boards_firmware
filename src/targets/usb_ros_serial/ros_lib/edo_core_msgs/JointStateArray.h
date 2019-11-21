@@ -29,15 +29,14 @@ namespace edo_core_msgs
     virtual int serialize(unsigned char *outbuffer) const
     {
       int offset = 0;
-      union {
-        uint64_t real;
-        uint32_t base;
-      } u_joints_mask;
-      u_joints_mask.real = this->joints_mask;
-      *(outbuffer + offset + 0) = (u_joints_mask.base >> (8 * 0)) & 0xFF;
-      *(outbuffer + offset + 1) = (u_joints_mask.base >> (8 * 1)) & 0xFF;
-      *(outbuffer + offset + 2) = (u_joints_mask.base >> (8 * 2)) & 0xFF;
-      *(outbuffer + offset + 3) = (u_joints_mask.base >> (8 * 3)) & 0xFF;
+      *(outbuffer + offset + 0) = (this->joints_mask >> (8 * 0)) & 0xFF;
+      *(outbuffer + offset + 1) = (this->joints_mask >> (8 * 1)) & 0xFF;
+      *(outbuffer + offset + 2) = (this->joints_mask >> (8 * 2)) & 0xFF;
+      *(outbuffer + offset + 3) = (this->joints_mask >> (8 * 3)) & 0xFF;
+      *(outbuffer + offset + 4) = (this->joints_mask >> (8 * 4)) & 0xFF;
+      *(outbuffer + offset + 5) = (this->joints_mask >> (8 * 5)) & 0xFF;
+      *(outbuffer + offset + 6) = (this->joints_mask >> (8 * 6)) & 0xFF;
+      *(outbuffer + offset + 7) = (this->joints_mask >> (8 * 7)) & 0xFF;
       offset += sizeof(this->joints_mask);
       *(outbuffer + offset + 0) = (this->joints_length >> (8 * 0)) & 0xFF;
       *(outbuffer + offset + 1) = (this->joints_length >> (8 * 1)) & 0xFF;
@@ -53,16 +52,14 @@ namespace edo_core_msgs
     virtual int deserialize(unsigned char *inbuffer)
     {
       int offset = 0;
-      union {
-        uint64_t real;
-        uint32_t base;
-      } u_joints_mask;
-      u_joints_mask.base = 0;
-      u_joints_mask.base |= ((uint32_t) (*(inbuffer + offset + 0))) << (8 * 0);
-      u_joints_mask.base |= ((uint32_t) (*(inbuffer + offset + 1))) << (8 * 1);
-      u_joints_mask.base |= ((uint32_t) (*(inbuffer + offset + 2))) << (8 * 2);
-      u_joints_mask.base |= ((uint32_t) (*(inbuffer + offset + 3))) << (8 * 3);
-      this->joints_mask = u_joints_mask.real;
+      this->joints_mask =  ((uint64_t) (*(inbuffer + offset)));
+      this->joints_mask |= ((uint64_t) (*(inbuffer + offset + 1))) << (8 * 1);
+      this->joints_mask |= ((uint64_t) (*(inbuffer + offset + 2))) << (8 * 2);
+      this->joints_mask |= ((uint64_t) (*(inbuffer + offset + 3))) << (8 * 3);
+      this->joints_mask |= ((uint64_t) (*(inbuffer + offset + 4))) << (8 * 4);
+      this->joints_mask |= ((uint64_t) (*(inbuffer + offset + 5))) << (8 * 5);
+      this->joints_mask |= ((uint64_t) (*(inbuffer + offset + 6))) << (8 * 6);
+      this->joints_mask |= ((uint64_t) (*(inbuffer + offset + 7))) << (8 * 7);
       offset += sizeof(this->joints_mask);
       uint32_t joints_lengthT = ((uint32_t) (*(inbuffer + offset))); 
       joints_lengthT |= ((uint32_t) (*(inbuffer + offset + 1))) << (8 * 1); 
@@ -80,7 +77,7 @@ namespace edo_core_msgs
     }
 
     const char * getType(){ return "edo_core_msgs/JointStateArray"; };
-    const char * getMD5(){ return "38f54d17933ec5ce7cc0bf163bb44a61"; };
+    const char * getMD5(){ return "dafd61bc0f5113200f8439cc763f9222"; };
 
   };
 

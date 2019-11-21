@@ -24,6 +24,7 @@
 #include <core/common_msgs/Float32.hpp>
 #include <core/control_msgs/Encoder_State.hpp>
 #include <core/control_pid/PID2.hpp>
+#include <core/control_pid/Disengage.hpp>
 #include <comau_edo/edo_msgs/EdoJointVersion.hpp>
 
 // Nibbe basso: codifica su 4 bits
@@ -76,11 +77,13 @@
 
 // --- DEFINITION -------------------------------------------------------------
 namespace core {
+	
 namespace control_pid{
 class ControlNode:
     public mw::CoreNode,
     public mw::CoreConfigurable<ControlPIDNodeConfiguration>,
-    public PID2
+    public PID2,
+	public Disengage
 {
 public:
     ControlNode(
@@ -90,90 +93,36 @@ public:
         os::Thread::Priority               priority = os::Thread::PriorityEnum::NORMAL
     );
 
-    bool
-	communication_setup(const int ID, const float red_ratio);
-
+    bool communication_setup(const int ID, const float red_ratio);
     bool version_publish(const int &id);
-
-    void
-    ISR_updateCurrent(
-        float new_sample
-    );
-
-    void
-    ISR_updateVoltage(
-        float new_sample
-    );
-
-    void
-	setack(const uint8_t flag);
-	
+    void ISR_updateCurrent( float new_sample );
+    void ISR_updateVoltage( float new_sample );
+    void setack(const uint8_t flag);
     void setStatusMask(const uint8_t bit, const bool set);
-
-    float recoveryMove(float vr_DeltaPos, float vr_T);
-
-    void
-    disengage_brake(const uint32_t & time, const float & offset);
-
-    void
-    pos_calibration(void);
-	
-	void
-    current_calibration(void);
-	
-	void
-	set_coll_threshold(float coll_limit);
-
-    virtual
-    ~ControlNode();
+    void disengage_brake(const uint32_t & time, const float & offset);
+    void pos_calibration(void);
+	void current_calibration(void);
+	void set_coll_threshold(float coll_limit);
+	void set_doublecheck_threshold(float diff_limit);
+    virtual ~ControlNode();
 
 
 private:
-    bool
-    onInitialize();
 
-    bool
-    onConfigure();
-
-    bool
-    onPrepareHW();
-
-    bool
-    onPrepareMW();
-
-    bool
-    onStart();
-
-    bool
-    onLoop();
-
-    bool
-    onStop();
-
-    static bool
-    setpoint_callback(
-        const core::control_msgs::Ctrlpnt_f32& msg,
-        void*                                  context
-    );
-
-    static bool
-    parameters_callback(
-        const core::control_msgs::PID_param& msg,
-        void*                                context
-    );
-
-    float
-    filterCurrent();
-
-    float
-    filterVoltage();
-	
-	unsigned int 
-    safetyCheck(float _misFiltered, bool _fllerr, bool _fllerr_power);
-
-private:
-
-
+    bool onInitialize();
+    bool onConfigure();
+    bool onPrepareHW();
+    bool onPrepareMW();
+    bool onStart();
+    bool onLoop();
+    bool onStop();
+    static bool setpoint_callback( const core::control_msgs::Ctrlpnt_f32& msg, void* context );
+    static bool parameters_callback( const core::control_msgs::PID_param& msg, void* context );
+    float filterCurrent();
+    float filterVoltage();
+	unsigned int safetyCheck( float _misFiltered, bool _fllerr, bool _fllerr_power );
+	void engageElectricBrakes(void);
+	void disengageElectricBrakes(void);
     //Devices
     core::utils::BasicSensor<float>&   _encoder;
     core::utils::BasicActuator<float>& _motor;
@@ -184,19 +133,18 @@ private:
     mw::Subscriber<core::control_msgs::PID_param, 2>   _subscriber_parameters;
     mw::Publisher<comau_edo::edo_msgs::EdoJointVersion>   _version_publisher;
 
-
     //Internal variables
-    float _target;								//Angular position target
-    float _accpos;								//Accumultade angular position
-    float _calibpos;							//Angular position calibration offset
-    float _calibtarget;							//Target position calibration offset
-    float _ff_vel;								//Velocity feedforward
-    float _current;                             //Dynamic Model Current
-    float _ff_torque;							//Torque feedforward
-    float _currvel;								//Motor speed
-	int   _ErrorCheckSafe;                      // Safety variable
-    int   _ackindex;							//
-	int   _identity;
+    float   _target;								//Angular position target
+    float   _accpos;								//Accumultade angular position
+    float   _calibpos;							//Angular position calibration offset
+    float   _calibtarget;							//Target position calibration offset
+    float   _ff_vel;								//Velocity feedforward
+    float   _current;                             //Dynamic Model Current
+    float   _ff_torque;							//Torque feedforward
+    float   _currvel;								//Motor speed
+	int     _ErrorCheckSafe;                      // Safety variable
+    int     _ackindex;							//
+	int     _identity;
     uint8_t _ack;								//Acknowledge/Errors
     uint8_t _jnt_err;							//Joint warnings/errors
 
@@ -225,22 +173,20 @@ private:
     bool     _comm_ready;
     uint32_t _calibrat_cntr;
     float    _current_offset;
-    uint32_t _disengage_cntr;
-    uint32_t _disengageSteps;
-    float    _disengage_frequency;
-    float    _disengageOffset;
     bool     _pos_calibration;
     bool     _current_calibration;
     bool     _current_calibration_completed;
     float    _target_predisengage;
     float    _current_limit;
-    bool     _disengage_status;
-    bool     _disengage_start;
-    int      _brake_status;
+	float    _res_diff_limit;
+ 
       //---------SAFETY CHECK -------//
-    bool    _fllerr;
-    bool    _fllerr_power;
-    float   _misFiltered;
+    bool     _fllerr;
+    bool     _fllerr_power;
+	bool     _velerr;
+	bool 	 _set_Enable;
+    float    _misFiltered;
+	bool 	 _savepos_flag;
 };
 }
 }

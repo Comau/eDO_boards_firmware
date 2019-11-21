@@ -32,6 +32,10 @@ InterpNode::InterpNode(
 	_comm_ready(false),
 	_pos_calibration(false)
 {
+	_arm_pos[0] = 0.0f;
+	_arm_pos[1] = 0.0f;
+	_arm_pos[2] = 0.0f;
+	
 	for (int i = 0; i < SETPNT_LEN; i++) {
 		_setpoint[i].position       = 0.0f;
 		_setpoint[i].velocity       = 0.0f;
@@ -57,41 +61,35 @@ InterpNode::~InterpNode()
     teardown();
 }
 
-bool
-InterpNode::onInitialize()
+bool InterpNode::onInitialize()
 {
     bool success = true;
 
     return success;
 }
 
-bool
-InterpNode::onConfigure()
+bool InterpNode::onConfigure()
 {
     bool success = true;
 
     return success;
 }
 
-bool
-InterpNode::onPrepareHW()
+bool InterpNode::onPrepareHW()
 {
     bool success = true;
 
     return success;
 }
 
-bool
-InterpNode::onPrepareMW()
+bool InterpNode::onPrepareMW()
 {
 	_setpoint_subscriber.set_callback(InterpNode::callback_setpnt);
-
 
     return true;
 }
 
-bool
-InterpNode::onStart()
+bool InterpNode::onStart()
 {
     bool success = true;
 
@@ -101,8 +99,7 @@ InterpNode::onStart()
 }
 
 #ifdef INTERPOLATION_HERMITE
-float
-InterpNode::interpolate(float step, float startp, float startv, float endp, float endv)
+float InterpNode::interpolate(float step, float startp, float startv, float endp, float endv)
 {
 	float s2 = step  * step;
 	float s3 = s2 * step;
@@ -119,8 +116,7 @@ InterpNode::interpolate(float step, float startp, float startv, float endp, floa
 }
 #endif
 
-bool
-InterpNode::onLoop()
+bool InterpNode::onLoop()
 {
 	float current_step = 0.0f;
 	float current_ffv  = 0.0f;
@@ -200,11 +196,15 @@ InterpNode::onLoop()
 #endif
 
 	// Publish the interpolated control point to the PID chain
-	if (_comm_ready &&
-		(_control_publisher.alloc(ang_setpnt))) {
+	if (_comm_ready && (_control_publisher.alloc(ang_setpnt))) 
+	{
 		ang_setpnt->value = _current_pos;
 		ang_setpnt->ffv   = _startpoint.acceleration;
 		ang_setpnt->fft   = current_fft;
+		ang_setpnt->arm_position[0] = _arm_pos[0];
+		ang_setpnt->arm_position[1] = _arm_pos[1];
+		ang_setpnt->arm_position[2] = _arm_pos[2];
+		ang_setpnt->R_rasp = _R_rasp;
 		_control_publisher.publish(ang_setpnt);
 	}
 
@@ -219,19 +219,14 @@ InterpNode::onLoop()
     return true;
 } // InterpNode::onLoop
 
-bool
-InterpNode::onStop()
+bool InterpNode::onStop()
 {
     bool success = true;
 
     return success;
 }
 
-bool
-InterpNode::callback_setpnt(
-    const comau_edo::edo_msgs::EdoJointCtrl& msg,
-    void*                                    context
-)
+bool InterpNode::callback_setpnt( const comau_edo::edo_msgs::EdoJointCtrl& msg, void* context )
 {
 	InterpNode* _this = static_cast<InterpNode*>(context);
 
@@ -241,16 +236,17 @@ InterpNode::callback_setpnt(
 		_this->_num_setp += 1;
 		// Insert the new setpoint into queue head
 		_this->_setpoint[_this->_head_setp] = msg;
+		_this->_arm_pos[0] = msg.arm_position[0];
+		_this->_arm_pos[1] = msg.arm_position[1];
+		_this->_arm_pos[2] = msg.arm_position[2];
+		_this->_R_rasp     = msg.R_rasp;
 	}
 
     return true;
 }
 
 
-bool
-InterpNode::communication_setup(
-		const int ID
-)
+bool InterpNode::communication_setup( const int ID )
 {  //char _topic_setpnt[16];
    sprintf(_topic_setpnt, "j%d_setpnt",ID);
    this->subscribe(_setpoint_subscriber, _topic_setpnt);
@@ -264,9 +260,7 @@ InterpNode::communication_setup(
 
 }
 
-
-void
-InterpNode::pos_calibration(void)
+void InterpNode::pos_calibration(void)
 {
 	_pos_calibration = true;
 }

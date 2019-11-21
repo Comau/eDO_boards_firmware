@@ -4,15 +4,9 @@
  * subject to the License Agreement located in the file LICENSE.
  */
 
-
-
-
 #include <Module.hpp>
 
-
-#include <core/control_pid/ControlPID_Node.hpp>
 #include <core/master_package/MasterNode.hpp>
-#include<core/interpolation_package/InterpNode.hpp>
 
 #include <core/utils/math/Constants.hpp>
 #include <core/utils/math/Conversions.hpp>
@@ -24,7 +18,9 @@ enum INIT_MODE {
 	DISCOVERY_MODE = 0,  // 0
 	SET_MODE,            // 1
 	CANCEL_MODE,         // 2
-	THRESHOLD_MODE       // 3
+	THRESHOLD_MODE,      // 3 mod threshold for joint collision
+	MAXVEL_MODE,         // 4 mod factor for max velocity limit
+	FLLERR_MODE          // 5 mod factor for following error bound
 };
 
 // --- MODULE -----------------------------------------------------------------
@@ -36,11 +32,10 @@ extern Module module;
 namespace core {
 namespace master_package {
 MasterNode::MasterNode(
-    const char*                        name,
-    core::control_pid::ControlNode&    controller,
-    core::interpolation_package::InterpNode& interpolator,
-    os::Thread::Priority               priority
-
+    const char*                        			name,
+    core::control_pid::ControlNode&    			controller,
+    core::interpolation_package::InterpNode& 	interpolator,
+    os::Thread::Priority               			priority
 ) :
     CoreNode::CoreNode(name, priority),
     CoreConfigurable::CoreConfigurable(name),
@@ -59,14 +54,15 @@ MasterNode::~MasterNode()
 
 bool
 MasterNode::onInitialize()
-{    bool success = true;
-
+{    
+	bool success = true;
     return success;
 }
 
 bool
 MasterNode::onConfigure()
-{    bool success=true;
+{    
+	bool success=true;
 
 	_identity=configuration().Configured;
 	_reduction=configuration().Reduction;
@@ -77,7 +73,6 @@ MasterNode::onConfigure()
 bool
 MasterNode::onPrepareHW()
 {
-
     return true;
 }
 
@@ -172,7 +167,6 @@ MasterNode::init_callback(
 			if ((_this->_identity > 0) &&
 					(jmask & (1uL << (_this->_identity - 1))))
 			{
-
 				_this->_controller.setack(J_STATE_ACK_INIT);
 			}
 			break;
@@ -253,11 +247,40 @@ MasterNode::init_callback(
 		}
 		case (THRESHOLD_MODE):
 		{  // Set Threshold
+		
+			if ((_this->_identity > 0) &&
+				(jmask & (1uL << 6))) 
+			{
+				_this->_controller.set_doublecheck_threshold(msg.reduction);
+			}
+			
 			if ((_this->_identity > 0) &&
 				(jmask & (1uL << (_this->_identity - 1)))) 
 			{
-				
 				_this->_controller.set_coll_threshold(msg.reduction);
+				_this->_controller.setack(J_STATE_ACK_INIT);
+			}
+
+			break;
+		}
+		case (MAXVEL_MODE):
+		{  // Set multiplying factor for Max Velocity
+			if ((_this->_identity > 0) &&
+				(jmask & (1uL << (_this->_identity - 1)))) 
+			{
+				_this->_controller.set_maxvel_threshold(msg.reduction);
+				
+				_this->_controller.setack(J_STATE_ACK_INIT);
+			}
+
+			break;
+		}
+		case (FLLERR_MODE):
+		{  // Set multiplying factor for Following Error
+			if ((_this->_identity > 0) &&
+				(jmask & (1uL << (_this->_identity - 1)))) 
+			{
+				_this->_controller.set_fllerr_threshold(msg.reduction);
 				
 				_this->_controller.setack(J_STATE_ACK_INIT);
 			}
@@ -280,8 +303,8 @@ MasterNode::reset_callback(
 	MasterNode* _this = static_cast<MasterNode*>(context);
 
 	if ((_this->_identity > 0) &&
-		(msg.joints_mask & (1uL << (_this->_identity - 1)))) {
-
+		(msg.joints_mask & (1uL << (_this->_identity - 1)))) 
+	{
 		_this->_controller.disengage_brake(msg.disengage_steps, msg.disengage_offset);
 
 		_this->_controller.setack(J_STATE_ACK_RESET);
@@ -310,7 +333,7 @@ MasterNode::calibration_callback(
 		_this->_controller.setack(J_STATE_ACK_CALIB);
 		}
 		
-		if(msg.joints_mask & 0x20) // Only if is the 6 axes node is calibrated
+		if(msg.joints_mask & 0x20) // Only if is the 6 axes node is calibrated (0x20=32=00001)
 		{
 		_this->_controller.current_calibration();
 		}
@@ -336,8 +359,6 @@ MasterNode::version_callback(
 	return false;
 
 }
-
-
 
 }
 }

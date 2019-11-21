@@ -66,6 +66,7 @@ public:
 	const float & getVel(void);
 	const float & getCurrent(void);
 	const uint8_t & getCommandFlag(void);
+	const float & getCurRes(void);
 	const uint8_t & getCommandFlagPrev(void);
 	const bool & stateUpdated(void);
 	void setStateUpdated(const bool & updated);
@@ -81,12 +82,13 @@ public:
 private:
 
 	uint8_t _id;
-	float _pos;
-	float _vel;
-	float _current;
+	float   _pos;
+	float   _vel;
+	float   _current;
 	uint8_t _commandFlag; // ack
+	float   _cur_res_joint;
 	uint8_t _commandFlagPrev; // Previous image of the command flag
-	bool _state_updated;
+	bool    _state_updated;
 	
 	char _state_topic[10];
 	char _ctrl_topic[10];

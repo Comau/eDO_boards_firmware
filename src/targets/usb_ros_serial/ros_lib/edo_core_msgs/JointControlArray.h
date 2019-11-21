@@ -63,7 +63,7 @@ namespace edo_core_msgs
     }
 
     const char * getType(){ return "edo_core_msgs/JointControlArray"; };
-    const char * getMD5(){ return "fc08ec618ee557a2082dbd4320597984"; };
+    const char * getMD5(){ return "beebf50890342f3788d239a741cfb503"; };
 
   };
 

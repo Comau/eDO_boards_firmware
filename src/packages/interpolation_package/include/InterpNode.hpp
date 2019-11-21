@@ -88,7 +88,9 @@ private:
 	float _current_pos;
 	char _topic_setpnt[16];
 	char _topic_contr[16];
-
+	float _arm_pos[3];
+	float _R_rasp;
+	
     // [ang, ffv, fft]
     mw::Publisher<core::control_msgs::Ctrlpnt_f32>  _control_publisher;
 

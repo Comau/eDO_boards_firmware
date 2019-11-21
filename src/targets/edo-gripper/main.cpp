@@ -1028,7 +1028,7 @@ dynamixel_node(
 
     bool has_servo = false;
     while(!has_servo) {
-#if 1  
+#if 0  
       // Standard code to discover the ID of the connected dinamixel  
       uint8_t id = 0xFF;
       while ((id = dynet.scan(id)) != 0xFF) {

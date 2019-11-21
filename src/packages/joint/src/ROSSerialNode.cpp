@@ -20,7 +20,6 @@
 #define EDO_JOINT_FW_REVISION   1804
 #define EDO_JOINT_FW_SVN        458
 
-
 enum INIT_MODE {
 	DISCOVERY_MODE = 0,
 	SET_MODE,
@@ -186,6 +185,7 @@ ROSSerialNode::onLoop()
             _jnt_state_pub_msg.joints[j].velocity    = 0;
             _jnt_state_pub_msg.joints[j].current     = 0;
             _jnt_state_pub_msg.joints[j].commandFlag = _static_joints[j].getCommandFlag() | 0x20;
+			_jnt_state_pub_msg.joints[j].R_jnt       = 0;
           }
           else
           {
@@ -193,7 +193,12 @@ ROSSerialNode::onLoop()
             _jnt_state_pub_msg.joints[j].position    = _static_joints[j].getPos();
             _jnt_state_pub_msg.joints[j].velocity    = _static_joints[j].getVel();
             _jnt_state_pub_msg.joints[j].current     = _static_joints[j].getCurrent();
-	        }
+			_jnt_state_pub_msg.joints[j].R_jnt       = _static_joints[j].getCurRes();
+	
+			/* char buf[32];
+			sprintf(buf, "CurRes: %f", _static_joints[j].getCurRes());
+			nh.loginfo(buf); */
+	      }
         }
         else
         {
@@ -201,6 +206,7 @@ ROSSerialNode::onLoop()
           _jnt_state_pub_msg.joints[j].velocity    = 0;
           _jnt_state_pub_msg.joints[j].current     = 0;
           _jnt_state_pub_msg.joints[j].commandFlag = 0;
+		  _jnt_state_pub_msg.joints[j].R_jnt       = 0;
         }
       }
       
@@ -250,12 +256,18 @@ ROSSerialNode::callback_ros_jntctrl_(
 		  jntCtrl = &msg.joints[j];
 		  if(_static_joints[j]._publisher_ctrl.alloc(jntCtrlMsg))
 		  {
-			  jntCtrlMsg->position = jntCtrl->position;
-			  jntCtrlMsg->velocity = jntCtrl->velocity;
-			  jntCtrlMsg->acceleration = jntCtrl->current;
+			  jntCtrlMsg->position       = jntCtrl->position;
+			  jntCtrlMsg->velocity       = jntCtrl->velocity;
+			  jntCtrlMsg->acceleration   = jntCtrl->current;
 			  jntCtrlMsg->feedfwvelocity = jntCtrl->ff_velocity;
-			  jntCtrlMsg->feedfwtorque = jntCtrl->ff_current;
-
+			  jntCtrlMsg->feedfwtorque   = jntCtrl->ff_current;
+			  jntCtrlMsg->R_rasp         = jntCtrl->R_rasp;
+			  
+			  // saving current position of joints 1,2,3 from the encoder
+			  jntCtrlMsg->arm_position[0] = _static_joints[0].getPos();
+			  jntCtrlMsg->arm_position[1] = _static_joints[1].getPos();
+			  jntCtrlMsg->arm_position[2] = _static_joints[2].getPos();
+			  
 			  if(!_static_joints[j]._publisher_ctrl.publish(jntCtrlMsg))
 			  {
 				  // Handle error
@@ -304,7 +316,7 @@ ROSSerialNode::callback_ros_jntconfig_(
 	}
 
 	joints_mask = (uint32_t)msg.joints_mask;  // Use a local uint32_t mask, just to avoid long long
-
+		
 	/* Forward the received message to each joint */	
 	for (uint8_t j = 0; j < msg.joints_length; j++, joints_mask >>= 1)
 	{
@@ -314,25 +326,25 @@ ROSSerialNode::callback_ros_jntconfig_(
 		  jntConfig = &msg.joints[j];
 		  if(_static_joints[j]._publisher_config.alloc(jntConfigMsg))
 		  {
-		  	jntConfigMsg->kp = jntConfig->kp;
-		  	jntConfigMsg->ti = jntConfig->ti;
-		  	jntConfigMsg->td = jntConfig->td;
-		  	jntConfigMsg->sat = jntConfig->sat;
-		  	jntConfigMsg->kff = jntConfig->kff;
-		  	jntConfigMsg->max = jntConfig->max;
-		  	jntConfigMsg->kpv = jntConfig->kpv;
-		  	jntConfigMsg->tiv = jntConfig->tiv;
-		  	jntConfigMsg->tdv = jntConfig->tdv;
+		  	jntConfigMsg->kp   = jntConfig->kp;
+		  	jntConfigMsg->ti   = jntConfig->ti;
+		  	jntConfigMsg->td   = jntConfig->td;
+		  	jntConfigMsg->sat  = jntConfig->sat;
+		  	jntConfigMsg->kff  = jntConfig->kff;
+		  	jntConfigMsg->max  = jntConfig->max;
+		  	jntConfigMsg->kpv  = jntConfig->kpv;
+		  	jntConfigMsg->tiv  = jntConfig->tiv;
+		  	jntConfigMsg->tdv  = jntConfig->tdv;
 		  	jntConfigMsg->satv = jntConfig->satv;
 		  	jntConfigMsg->kffv = jntConfig->kffv;
 		  	jntConfigMsg->maxv = jntConfig->maxv;
-		  	jntConfigMsg->kpt = jntConfig->kpt;
-		  	jntConfigMsg->tit = jntConfig->tit;
-		  	jntConfigMsg->tdt = jntConfig->tdt;
+		  	jntConfigMsg->kpt  = jntConfig->kpt;
+		  	jntConfigMsg->tit  = jntConfig->tit;
+		  	jntConfigMsg->tdt  = jntConfig->tdt;
 		  	jntConfigMsg->satt = jntConfig->satt;
 		  	jntConfigMsg->kfft = jntConfig->kfft;
 		  	jntConfigMsg->maxt = jntConfig->maxt;
-		  	jntConfigMsg->kt = jntConfig->kt;
+		  	jntConfigMsg->kt   = jntConfig->kt;
 
 		  	if(!_static_joints[j]._publisher_config.publish(jntConfigMsg))
 		  	{
@@ -342,6 +354,7 @@ ROSSerialNode::callback_ros_jntconfig_(
 		  	}
 		  }
 		}
+		core::os::Thread::sleep(core::os::Time::ms(10));
 	}
 }
 

@@ -26,6 +26,12 @@
       "description": "ack command flag",
       "type": "UINT8",
       "size": 1
+    },
+	{
+      "name": "R_jnt",
+      "description": "current residual",
+      "type": "FLOAT32",
+      "size": 1
     }
   ]
 }

@@ -250,6 +250,7 @@ extern "C" {
         encoder_configuration_default.period = 1000;
         encoder_configuration_default.ticks  = 256*4;
         encoder_configuration_default.invert = 0;
+		
         led_subscriber_configuration_default.topic    = "led";
 		
         master_node_configuration_default.Configured = -1;
@@ -264,8 +265,6 @@ extern "C" {
         module.configurations().add(led_subscriber, led_subscriber_configuration_default);
         module.configurations().add(master_node,master_node_configuration_default);
         module.configurations().add(controller,control_node_configuration_default);
-		
-
 
 #if 0
 	    master_node.overrideConfiguration();
@@ -278,8 +277,7 @@ extern "C" {
         module.configurations().saveTo(module.configurationStorage());
 #endif
 
-
-        // ... and load the configuration
+        // ... and load the configuration from the storage
         module.configurations().loadFrom(module.configurationStorage());
 
         encoder.overrideConfiguration();

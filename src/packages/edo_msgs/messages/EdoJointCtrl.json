@@ -32,6 +32,18 @@
       "description": "FeedFw Torque component",
       "type": "FLOAT32",
       "size": 1
+    },
+	{
+      "name": "arm_position",
+      "description": "Arm position components",
+      "type": "FLOAT32",
+      "size": 3
+    },
+	{
+      "name": "R_rasp",
+      "description": "Current residual raspberry",
+      "type": "FLOAT32",
+      "size": 1
     }
   ]
 }

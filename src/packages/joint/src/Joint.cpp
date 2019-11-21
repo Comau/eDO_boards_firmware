@@ -92,6 +92,7 @@ Joint::callback_state_(
   _this->_vel = msg.velocity;
   _this->_current = msg.current;
   _this->_commandFlag = msg.commandFlag;
+  _this->_cur_res_joint = msg.R_jnt;
   _this->_state_updated = true;
 
   return true;
@@ -222,6 +223,11 @@ const float & Joint::getCurrent()
 const uint8_t & Joint::getCommandFlag()
 {
 	return _commandFlag;
+}
+
+const float & Joint::getCurRes()
+{
+	return _cur_res_joint;
 }
 
 const uint8_t & Joint::getCommandFlagPrev()
